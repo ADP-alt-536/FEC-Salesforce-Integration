@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>FEC_Committee_ID__c</fullName>
+    <description>FEC committee identifier (e.g., C00177436). Used as the external ID for upsert operations.</description>
+    <externalId>true</externalId>
+    <label>FEC Committee ID</label>
+    <length>20</length>
+    <required>true</required>
+    <type>Text</type>
+    <unique>true</unique>
+</CustomField>

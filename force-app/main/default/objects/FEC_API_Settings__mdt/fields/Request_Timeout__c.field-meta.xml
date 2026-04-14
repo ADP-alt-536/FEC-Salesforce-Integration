@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Request_Timeout__c</fullName>
+    <description>HTTP request timeout in milliseconds. Default: 120000.</description>
+    <fieldManageability>DeveloperControlled</fieldManageability>
+    <label>Request Timeout</label>
+    <precision>6</precision>
+    <scale>0</scale>
+    <type>Number</type>
+</CustomField>

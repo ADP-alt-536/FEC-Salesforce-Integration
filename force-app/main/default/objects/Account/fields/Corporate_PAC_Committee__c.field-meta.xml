@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Corporate_PAC_Committee__c</fullName>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <description>Links this Account to their corporate PAC committee in the FEC database.</description>
+    <label>Corporate PAC Committee</label>
+    <referenceTo>FEC_Committee__c</referenceTo>
+    <relationshipLabel>Linked Accounts</relationshipLabel>
+    <relationshipName>Linked_Accounts</relationshipName>
+    <required>false</required>
+    <type>Lookup</type>
+</CustomField>

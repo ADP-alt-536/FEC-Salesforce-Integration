@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Primary_Committee__c</fullName>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <description>The main campaign committee for this legislator.</description>
+    <label>Primary Committee</label>
+    <referenceTo>FEC_Committee__c</referenceTo>
+    <relationshipLabel>Primary Legislator</relationshipLabel>
+    <relationshipName>Primary_Legislators</relationshipName>
+    <required>false</required>
+    <type>Lookup</type>
+</CustomField>
