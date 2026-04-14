@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Legislator__c</fullName>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <description>Link to the Legislator if this is their campaign committee.</description>
+    <label>Legislator</label>
+    <referenceTo>Legislator__c</referenceTo>
+    <relationshipLabel>FEC Committees</relationshipLabel>
+    <relationshipName>FEC_Committees</relationshipName>
+    <required>false</required>
+    <type>Lookup</type>
+</CustomField>

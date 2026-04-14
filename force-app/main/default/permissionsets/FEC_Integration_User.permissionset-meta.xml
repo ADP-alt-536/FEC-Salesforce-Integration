@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Grants access to FEC integration objects, fields, and Apex classes. Assign to users who need to view or manage FEC PAC contribution data.</description>
+    <hasActivationRequired>false</hasActivationRequired>
+    <label>FEC Integration User</label>
+    <objectPermissions>
+        <allowCreate>true</allowCreate>
+        <allowDelete>false</allowDelete>
+        <allowEdit>true</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>FEC_Committee__c</object>
+        <viewAllRecords>true</viewAllRecords>
+    </objectPermissions>
+    <objectPermissions>
+        <allowCreate>true</allowCreate>
+        <allowDelete>false</allowDelete>
+        <allowEdit>true</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>false</modifyAllRecords>
+        <object>PAC_Contribution__c</object>
+        <viewAllRecords>true</viewAllRecords>
+    </objectPermissions>
+    <userLicense>Salesforce</userLicense>
+</PermissionSet>

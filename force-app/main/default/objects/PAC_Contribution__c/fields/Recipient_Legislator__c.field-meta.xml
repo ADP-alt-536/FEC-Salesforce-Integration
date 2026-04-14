@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Recipient_Legislator__c</fullName>
+    <deleteConstraint>SetNull</deleteConstraint>
+    <description>The legislator receiving the contribution (via their campaign committee).</description>
+    <label>Recipient Legislator</label>
+    <referenceTo>Legislator__c</referenceTo>
+    <relationshipLabel>PAC Contributions Received</relationshipLabel>
+    <relationshipName>PAC_Contributions_Received</relationshipName>
+    <required>false</required>
+    <type>Lookup</type>
+</CustomField>

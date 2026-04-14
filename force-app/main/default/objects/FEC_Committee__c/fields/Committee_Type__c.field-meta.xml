@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Committee_Type__c</fullName>
+    <label>Committee Type</label>
+    <required>false</required>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>House</fullName>
+                <default>false</default>
+                <label>House</label>
+            </value>
+            <value>
+                <fullName>Senate</fullName>
+                <default>false</default>
+                <label>Senate</label>
+            </value>
+            <value>
+                <fullName>Presidential</fullName>
+                <default>false</default>
+                <label>Presidential</label>
+            </value>
+            <value>
+                <fullName>PAC</fullName>
+                <default>false</default>
+                <label>PAC</label>
+            </value>
+            <value>
+                <fullName>Party</fullName>
+                <default>false</default>
+                <label>Party</label>
+            </value>
+            <value>
+                <fullName>Super PAC</fullName>
+                <default>false</default>
+                <label>Super PAC</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>
