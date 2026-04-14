@@ -1,0 +1,1 @@
+{\n  "packageDirectories": [\n    {\n      "path": "force-app",\n      "default": true\n    }\n  ],\n  "name": "FEC-Salesforce-Integration",\n  "namespace": "",\n  "sfdcLoginUrl": "https://login.salesforce.com",\n  "sourceApiVersion": "59.0"\n}
