@@ -2,9 +2,19 @@
  * FECPACContributionSyncTest
  *
  * Unit tests for FECPACContributionSync.
+ * Uses the @TestVisible FECAPIService constructor to bypass Custom Metadata.
  */
 @IsTest
 private class FECPACContributionSyncTest {
+
+    /** Returns a test FECAPIService that bypasses Custom Metadata. */
+    private static FECAPIService testApiService() {
+        return new FECAPIService('TEST_API_KEY', 'https://api.open.fec.gov/v1', 120000, 100);
+    }
+
+    private static FECCommitteeSync testCommitteeSync() {
+        return new FECCommitteeSync(testApiService());
+    }
 
     @IsTest
     static void testSyncContributions_createsPACContribution() {
@@ -25,7 +35,8 @@ private class FECPACContributionSyncTest {
             }));
 
         Test.startTest();
-        FECPACContributionSync sync = new FECPACContributionSync();
+        FECAPIService apiSvc = testApiService();
+        FECPACContributionSync sync = new FECPACContributionSync(apiSvc, new FECCommitteeSync(apiSvc));
         List<PAC_Contribution__c> results =
             sync.syncContributions('C00177436', 2024, null);
         Test.stopTest();
@@ -45,7 +56,8 @@ private class FECPACContributionSyncTest {
             new FECAPIMock(FECAPIMock.MockType.SCHEDULE_A_EMPTY));
 
         Test.startTest();
-        FECPACContributionSync sync = new FECPACContributionSync();
+        FECAPIService apiSvc = testApiService();
+        FECPACContributionSync sync = new FECPACContributionSync(apiSvc, new FECCommitteeSync(apiSvc));
         List<PAC_Contribution__c> results =
             sync.syncContributions('C00177436', 2024, null);
         Test.stopTest();
@@ -79,7 +91,8 @@ private class FECPACContributionSyncTest {
             new FECAPIMock(FECAPIMock.MockType.SCHEDULE_A_CONTRIBUTIONS));
 
         Test.startTest();
-        FECPACContributionSync sync = new FECPACContributionSync();
+        FECAPIService apiSvc = testApiService();
+        FECPACContributionSync sync = new FECPACContributionSync(apiSvc, new FECCommitteeSync(apiSvc));
         List<PAC_Contribution__c> results =
             sync.syncContributions('C00177436', 2024, null);
         Test.stopTest();
@@ -110,7 +123,8 @@ private class FECPACContributionSyncTest {
             }));
 
         Test.startTest();
-        FECPACContributionSync sync = new FECPACContributionSync();
+        FECAPIService apiSvc = testApiService();
+        FECPACContributionSync sync = new FECPACContributionSync(apiSvc, new FECCommitteeSync(apiSvc));
         List<PAC_Contribution__c> results =
             sync.syncContributions('C00177436', 2024, leg.Id);
         Test.stopTest();

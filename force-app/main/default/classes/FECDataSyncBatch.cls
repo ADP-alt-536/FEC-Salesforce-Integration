@@ -19,6 +19,14 @@ public with sharing class FECDataSyncBatch
     private Integer cycle;
     private Integer batchSize;
 
+    /**
+     * Overrideable factory for creating the FECAPIService.
+     * In tests, replace this with a @TestVisible override to inject a pre-configured service
+     * that bypasses Custom Metadata lookup.
+     */
+    @TestVisible
+    private FECAPIService testApiServiceOverride = null;
+
     /** Default constructor uses the current election cycle. */
     public FECDataSyncBatch() {
         this(currentCycle(), 5);
@@ -48,7 +56,7 @@ public with sharing class FECDataSyncBatch
     }
 
     public void execute(Database.BatchableContext bc, List<SObject> scope) {
-        FECAPIService         apiSvc  = new FECAPIService();
+        FECAPIService         apiSvc  = createApiService();
         FECCommitteeSync      commSvc = new FECCommitteeSync(apiSvc);
         FECPACContributionSync pacSvc = new FECPACContributionSync(apiSvc, commSvc);
 
@@ -99,10 +107,22 @@ public with sharing class FECDataSyncBatch
         );
     }
 
-    /** Returns the current (or upcoming) election cycle year. */
+    /**
+     * Returns the current (or upcoming) election cycle year.
+     * FEC cycles are even-numbered; if in an odd year the next even year is returned.
+     */
     private static Integer currentCycle() {
         Integer year = Date.today().year();
-        // FEC cycles are even-numbered years
         return (Math.mod(year, 2) == 0) ? year : year + 1;
+    }
+
+    /**
+     * Creates the FECAPIService to use in execute().
+     * In tests, set testApiServiceOverride to inject a pre-configured service.
+     */
+    private FECAPIService createApiService() {
+        return (testApiServiceOverride != null)
+            ? testApiServiceOverride
+            : new FECAPIService();
     }
 }

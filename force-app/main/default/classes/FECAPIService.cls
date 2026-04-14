@@ -53,10 +53,22 @@ public with sharing class FECAPIService {
     private Integer timeoutMs;
     private Integer pageSize;
 
-    // ─── Constructor ─────────────────────────────────────────────────────────
+    // ─── Constructors ────────────────────────────────────────────────────────
 
     public FECAPIService() {
         loadSettings();
+    }
+
+    /**
+     * Test-only constructor that injects settings directly, bypassing the
+     * Custom Metadata query and API key validation.
+     */
+    @TestVisible
+    private FECAPIService(String apiKey, String baseUrl, Integer timeoutMs, Integer pageSize) {
+        this.apiKey    = apiKey;
+        this.baseUrl   = baseUrl;
+        this.timeoutMs = timeoutMs;
+        this.pageSize  = pageSize;
     }
 
     // ─── Public API ──────────────────────────────────────────────────────────
@@ -214,7 +226,8 @@ public with sharing class FECAPIService {
             settings = settingsList[0];
         }
 
-        if (settings != null && String.isNotBlank(settings.API_Key__c)) {
+        if (settings != null && String.isNotBlank(settings.API_Key__c)
+                && settings.API_Key__c != 'REPLACE_WITH_YOUR_FEC_API_KEY') {
             apiKey    = settings.API_Key__c;
             baseUrl   = String.isNotBlank(settings.Base_URL__c)
                             ? settings.Base_URL__c
@@ -226,11 +239,14 @@ public with sharing class FECAPIService {
                             ? (Integer) settings.Batch_Size__c
                             : 100;
         } else {
-            // Fallback defaults – caller must supply a real API key in production
-            apiKey    = '';
-            baseUrl   = 'https://api.open.fec.gov/v1';
-            timeoutMs = 120000;
-            pageSize  = 100;
+            // Throw a descriptive error when the API key has not been configured.
+            // Replace the placeholder in FEC_API_Settings__mdt (Default record)
+            // with a valid key obtained from https://api.data.gov/signup/
+            throw new FECAPIException(
+                'FEC API key is not configured. '
+                + 'Please update FEC_API_Settings__mdt (Default record) '
+                + 'with a valid API key from https://api.data.gov/signup/'
+            );
         }
     }
 
@@ -299,7 +315,9 @@ public with sharing class FECAPIService {
 
     private static Date toDate(Object val) {
         if (val == null) { return null; }
-        String s = String.valueOf(val).substring(0, 10); // yyyy-MM-dd
+        String s = String.valueOf(val);
+        if (s.length() < 10) { return null; }
+        s = s.substring(0, 10); // yyyy-MM-dd (handles both date and datetime strings)
         try { return Date.valueOf(s); }
         catch (Exception e) { return null; }
     }

@@ -2,9 +2,16 @@
  * FECDataSyncBatchTest
  *
  * Unit tests for FECDataSyncBatch and FECDataSyncScheduler.
+ * Uses the @TestVisible FECAPIService constructor and testApiServiceOverride
+ * to bypass Custom Metadata configuration.
  */
 @IsTest
 private class FECDataSyncBatchTest {
+
+    /** Returns a test FECAPIService that bypasses Custom Metadata. */
+    private static FECAPIService testApiService() {
+        return new FECAPIService('TEST_API_KEY', 'https://api.open.fec.gov/v1', 120000, 100);
+    }
 
     @TestSetup
     static void setupTestData() {
@@ -40,7 +47,9 @@ private class FECDataSyncBatchTest {
             }));
 
         Test.startTest();
-        Database.executeBatch(new FECDataSyncBatch(2024, 5), 5);
+        FECDataSyncBatch batch = new FECDataSyncBatch(2024, 5);
+        batch.testApiServiceOverride = testApiService();
+        Database.executeBatch(batch, 5);
         Test.stopTest();
 
         // Legislator 1 should have a committee and Primary_Committee__c set
@@ -59,7 +68,6 @@ private class FECDataSyncBatchTest {
 
     @IsTest
     static void testBatch_defaultConstructorUsesCycle() {
-        // No callouts needed for this constructor test
         Test.startTest();
         FECDataSyncBatch batch = new FECDataSyncBatch();
         Test.stopTest();

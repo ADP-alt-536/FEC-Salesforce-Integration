@@ -2,10 +2,16 @@
  * FECCommitteeSyncTest
  *
  * Unit tests for FECCommitteeSync.
- * Uses FECAPIMock to stub HTTP callouts.
+ * Uses FECAPIMock to stub HTTP callouts and the @TestVisible FECAPIService
+ * constructor to bypass Custom Metadata configuration.
  */
 @IsTest
 private class FECCommitteeSyncTest {
+
+    /** Returns a test FECAPIService that bypasses Custom Metadata. */
+    private static FECAPIService testApiService() {
+        return new FECAPIService('TEST_API_KEY', 'https://api.open.fec.gov/v1', 120000, 100);
+    }
 
     @IsTest
     static void testSyncCommittee_createsRecord() {
@@ -13,7 +19,7 @@ private class FECCommitteeSyncTest {
             new FECAPIMock(FECAPIMock.MockType.COMMITTEE_FINANCIALS));
 
         Test.startTest();
-        FECCommitteeSync sync = new FECCommitteeSync();
+        FECCommitteeSync sync = new FECCommitteeSync(testApiService());
         FEC_Committee__c result = sync.syncCommittee('C00177436', 2024, null);
         Test.stopTest();
 
@@ -33,7 +39,7 @@ private class FECCommitteeSyncTest {
             new FECAPIMock(FECAPIMock.MockType.COMMITTEE_FINANCIALS_EMPTY));
 
         Test.startTest();
-        FECCommitteeSync sync = new FECCommitteeSync();
+        FECCommitteeSync sync = new FECCommitteeSync(testApiService());
         FEC_Committee__c result = sync.syncCommittee('C00177436', 2024, null);
         Test.stopTest();
 
@@ -48,7 +54,7 @@ private class FECCommitteeSyncTest {
             new FECAPIMock(FECAPIMock.MockType.COMMITTEE_FINANCIALS));
 
         Test.startTest();
-        FECCommitteeSync sync   = new FECCommitteeSync();
+        FECCommitteeSync sync   = new FECCommitteeSync(testApiService());
         List<FEC_Committee__c> results =
             sync.syncCommittees(new List<String>{'C00177436', 'C00222222'}, 2024);
         Test.stopTest();
@@ -73,7 +79,7 @@ private class FECCommitteeSyncTest {
             }));
 
         Test.startTest();
-        FECCommitteeSync sync   = new FECCommitteeSync();
+        FECCommitteeSync sync   = new FECCommitteeSync(testApiService());
         FEC_Committee__c result =
             sync.syncLegislatorPrimaryCommittee(leg.Id, 'H00001234', 2024);
         Test.stopTest();
@@ -95,7 +101,7 @@ private class FECCommitteeSyncTest {
         insert leg;
 
         Test.startTest();
-        FECCommitteeSync sync   = new FECCommitteeSync();
+        FECCommitteeSync sync   = new FECCommitteeSync(testApiService());
         FEC_Committee__c result =
             sync.syncLegislatorPrimaryCommittee(leg.Id, '', 2024);
         Test.stopTest();
@@ -116,7 +122,7 @@ private class FECCommitteeSyncTest {
             new FECAPIMock(FECAPIMock.MockType.PRINCIPAL_COMMITTEE_EMPTY));
 
         Test.startTest();
-        FECCommitteeSync sync   = new FECCommitteeSync();
+        FECCommitteeSync sync   = new FECCommitteeSync(testApiService());
         FEC_Committee__c result =
             sync.syncLegislatorPrimaryCommittee(leg.Id, 'H99999999', 2024);
         Test.stopTest();

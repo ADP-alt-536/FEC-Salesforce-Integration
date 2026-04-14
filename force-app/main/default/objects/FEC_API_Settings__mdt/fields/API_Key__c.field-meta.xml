@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
     <fullName>API_Key__c</fullName>
-    <description>FEC OpenFEC API key. Store this value securely.</description>
+    <description>FEC OpenFEC API key. For enhanced security, consider using Named Credentials with External Credentials instead of storing the key here. Obtain a key at https://api.data.gov/signup/</description>
     <fieldManageability>DeveloperControlled</fieldManageability>
     <label>API Key</label>
     <length>255</length>
