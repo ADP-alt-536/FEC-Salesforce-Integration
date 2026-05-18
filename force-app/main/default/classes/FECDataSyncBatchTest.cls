@@ -17,15 +17,13 @@ private class FECDataSyncBatchTest {
     static void setupTestData() {
         List<Legislator__c> legislators = new List<Legislator__c>{
             new Legislator__c(
-                Name               = 'Alice Smith',
                 FEC_Candidate_ID__c = 'H00001111'
             ),
             new Legislator__c(
-                Name               = 'Bob Jones',
                 FEC_Candidate_ID__c = 'H00002222'
             ),
             // This one has no FEC ID and should be skipped
-            new Legislator__c(Name = 'No FEC ID')
+            new Legislator__c(FEC_Candidate_ID__c = null)
         };
         insert legislators;
     }

@@ -105,7 +105,6 @@ private class FECPACContributionSyncTest {
     @IsTest
     static void testSyncContributions_linksLegislator() {
         Legislator__c leg = new Legislator__c(
-            Name               = 'Test Legislator',
             FEC_Candidate_ID__c = 'H00001234'
         );
         insert leg;

@@ -46,7 +46,6 @@
     <description>Tracks individual PAC contributions from the FEC Schedule A filings. Links contributing PACs to recipient campaign committees.</description>
     <enableActivities>true</enableActivities>
     <enableBulkApi>true</enableBulkApi>
-    <enableChangeDataCapture>false</enableChangeDataCapture>
     <enableFeeds>false</enableFeeds>
     <enableHistory>true</enableHistory>
     <enableLicensing>false</enableLicensing>
