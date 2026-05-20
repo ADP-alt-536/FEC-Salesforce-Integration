@@ -46,7 +46,6 @@
     <description>Represents FEC committees including candidate committees, PACs, and party committees. Synced from the Federal Election Commission OpenFEC API.</description>
     <enableActivities>true</enableActivities>
     <enableBulkApi>true</enableBulkApi>
-    <enableChangeDataCapture>false</enableChangeDataCapture>
     <enableFeeds>false</enableFeeds>
     <enableHistory>true</enableHistory>
     <enableLicensing>false</enableLicensing>

@@ -21,5 +21,4 @@
         <object>PAC_Contribution__c</object>
         <viewAllRecords>true</viewAllRecords>
     </objectPermissions>
-    <userLicense>Salesforce</userLicense>
 </PermissionSet>

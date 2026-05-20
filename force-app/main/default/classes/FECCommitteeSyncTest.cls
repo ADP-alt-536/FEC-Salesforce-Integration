@@ -66,7 +66,6 @@ private class FECCommitteeSyncTest {
     static void testSyncLegislatorPrimaryCommittee_linksLegislator() {
         // Need a Legislator__c record – create a minimal one
         Legislator__c leg = new Legislator__c(
-            Name               = 'Jane Test',
             FEC_Candidate_ID__c = 'H00001234'
         );
         insert leg;
@@ -97,7 +96,7 @@ private class FECCommitteeSyncTest {
 
     @IsTest
     static void testSyncLegislatorPrimaryCommittee_blankCandidateId_returnsNull() {
-        Legislator__c leg = new Legislator__c(Name = 'No FEC');
+        Legislator__c leg = new Legislator__c();
         insert leg;
 
         Test.startTest();
@@ -113,7 +112,6 @@ private class FECCommitteeSyncTest {
     @IsTest
     static void testSyncLegislatorPrimaryCommittee_noCommitteeFound_returnsNull() {
         Legislator__c leg = new Legislator__c(
-            Name               = 'No Committee',
             FEC_Candidate_ID__c = 'H99999999'
         );
         insert leg;
