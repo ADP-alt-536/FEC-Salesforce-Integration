@@ -7,6 +7,6 @@
   ],
   "name": "FEC-Salesforce-Integration",
   "namespace": "",
-  "sfdcLoginUrl": "https://login.salesforce.com",
+  "sfdcLoginUrl": " https://califesciences--staging.sandbox.my.salesforce.com",
   "sourceApiVersion": "59.0"
 }
