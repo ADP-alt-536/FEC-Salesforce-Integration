@@ -85,7 +85,7 @@ public with sharing class FECAPIService {
         if (String.isBlank(committeeId)) {
             return null;
         }
-        String path = '/committee/' + EncodingUtil.urlEncode(committeeId, 'UTF-8')
+        String path = '/v1/committee/' + EncodingUtil.urlEncode(committeeId, 'UTF-8')
                       + '/totals/?cycle=' + cycle
                       + '&api_key=' + EncodingUtil.urlEncode(apiKey, 'UTF-8');
 
@@ -130,7 +130,7 @@ public with sharing class FECAPIService {
         }
 
         String queryString = buildQueryString(committeeId, params);
-        Map<String, Object> resp = makeGetRequest('/schedules/schedule_a/' + queryString);
+        Map<String, Object> resp = makeGetRequest('/v1/schedules/schedule_a/' + queryString);
         if (resp == null) {
             return new List<ScheduleAContribution>();
         }
@@ -173,7 +173,7 @@ public with sharing class FECAPIService {
         if (String.isBlank(committeeId)) {
             return null;
         }
-        String path = '/committee/' + EncodingUtil.urlEncode(committeeId, 'UTF-8')
+        String path = '/v1/committee/' + EncodingUtil.urlEncode(committeeId, 'UTF-8')
                       + '/?api_key=' + EncodingUtil.urlEncode(apiKey, 'UTF-8');
         Map<String, Object> resp = makeGetRequest(path);
         if (resp == null) {
@@ -197,7 +197,7 @@ public with sharing class FECAPIService {
         if (String.isBlank(candidateId)) {
             return null;
         }
-        String path = '/candidate/' + EncodingUtil.urlEncode(candidateId, 'UTF-8')
+        String path = '/v1/candidate/' + EncodingUtil.urlEncode(candidateId, 'UTF-8')
                       + '/committees/?designation=P&cycle=' + cycle
                       + '&api_key=' + EncodingUtil.urlEncode(apiKey, 'UTF-8');
         Map<String, Object> resp = makeGetRequest(path);
