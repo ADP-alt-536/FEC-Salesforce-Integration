@@ -49,6 +49,21 @@ private class FECAPIServiceTest {
     }
 
     @IsTest
+    static void testGetCommitteeFinancials_endingCashOnHandField() {
+        Test.setMock(HttpCalloutMock.class,
+            new FECAPIMock(FECAPIMock.MockType.COMMITTEE_FINANCIALS_ENDING_CASH));
+
+        Test.startTest();
+        FECAPIService.CommitteeFinancials fin =
+            testService().getCommitteeFinancials('C00177436', 2024);
+        Test.stopTest();
+
+        System.assertNotEquals(null, fin, 'CommitteeFinancials should not be null');
+        System.assertEquals(750000.00, fin.cashOnHand,
+            'Cash on hand should map from ending_cash_on_hand when present');
+    }
+
+    @IsTest
     static void testGetCommitteeFinancials_nullCommitteeId() {
         Test.startTest();
         FECAPIService.CommitteeFinancials fin =

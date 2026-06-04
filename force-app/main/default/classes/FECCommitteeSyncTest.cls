@@ -49,6 +49,20 @@ private class FECCommitteeSyncTest {
     }
 
     @IsTest
+    static void testSyncCommittee_endingCashOnHandField_populatesCashOnHand() {
+        Test.setMock(HttpCalloutMock.class,
+            new FECAPIMock(FECAPIMock.MockType.COMMITTEE_FINANCIALS_ENDING_CASH));
+
+        Test.startTest();
+        FECCommitteeSync sync = new FECCommitteeSync(testApiService());
+        FEC_Committee__c result = sync.syncCommittee('C00177436', 2024, null);
+        Test.stopTest();
+
+        System.assertEquals(750000.00, result.Cash_on_Hand__c,
+            'Cash_on_Hand__c should map from ending_cash_on_hand');
+    }
+
+    @IsTest
     static void testSyncCommittees_multipleIds() {
         Test.setMock(HttpCalloutMock.class,
             new FECAPIMock(FECAPIMock.MockType.COMMITTEE_FINANCIALS));

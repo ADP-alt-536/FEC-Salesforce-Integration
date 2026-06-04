@@ -4,11 +4,11 @@
     <protected>false</protected>
     <values>
         <field>API_Key__c</field>
-        <value xsi:type="xsd:string">REPLACE_WITH_YOUR_FEC_API_KEY</value>
+        <value xsi:type="xsd:string">oqiPFCVUty0NCh97cZzTNgyyGpmZ2gKKWDipBAce</value>
     </values>
     <values>
         <field>Base_URL__c</field>
-        <value xsi:type="xsd:string">https://api.open.fec.gov/v1</value>
+        <value xsi:type="xsd:string">https://api.open.fec.gov</value>
     </values>
     <values>
         <field>Request_Timeout__c</field>

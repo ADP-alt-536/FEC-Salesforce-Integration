@@ -105,7 +105,10 @@ public with sharing class FECAPIService {
         fin.committeeName       = (String)  safeGet(row, 'committee_name');
         fin.committeeType       = mapCommitteeType((String) safeGet(row, 'committee_type_full'));
         fin.designation         = (String)  safeGet(row, 'designation_full');
-        fin.cashOnHand          = toDecimal(safeGet(row, 'cash_on_hand_end_period'));
+        fin.cashOnHand          = firstDecimal(row, new List<String>{
+            'ending_cash_on_hand',
+            'cash_on_hand_end_period'
+        });
         fin.totalReceipts       = toDecimal(safeGet(row, 'receipts'));
         fin.totalDisbursements  = toDecimal(safeGet(row, 'disbursements'));
         fin.cycle               = cycle;
@@ -330,6 +333,20 @@ public with sharing class FECAPIService {
         if (val instanceof Long)    { return ((Long)    val).intValue(); }
         try { return Integer.valueOf(String.valueOf(val)); }
         catch (Exception e) { return null; }
+    }
+
+    /** Returns the first non-null decimal found among the given JSON keys. */
+    private static Decimal firstDecimal(Map<String, Object> row, List<String> keys) {
+        if (row == null || keys == null) {
+            return null;
+        }
+        for (String key : keys) {
+            Decimal parsed = toDecimal(safeGet(row, key));
+            if (parsed != null) {
+                return parsed;
+            }
+        }
+        return null;
     }
 
     /**
