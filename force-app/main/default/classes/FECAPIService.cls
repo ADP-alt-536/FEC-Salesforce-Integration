@@ -107,7 +107,9 @@ public with sharing class FECAPIService {
         fin.designation         = (String)  safeGet(row, 'designation_full');
         fin.cashOnHand          = firstDecimal(row, new List<String>{
             'ending_cash_on_hand',
-            'cash_on_hand_end_period'
+            'cash_on_hand_end_period',
+            'last_cash_on_hand_end_period',
+            'cash_on_hand_close_ytd'
         });
         fin.totalReceipts       = toDecimal(safeGet(row, 'receipts'));
         fin.totalDisbursements  = toDecimal(safeGet(row, 'disbursements'));
@@ -116,9 +118,10 @@ public with sharing class FECAPIService {
     }
 
     /**
-     * Retrieves Schedule A (receipts) contributions for the given committee.
-     * Only records where contributor_type = 'COMMITTEE' (i.e. PAC-to-candidate)
-     * are returned.
+    * Retrieves Schedule A (receipts) contributions for the given committee.
+    * Only records with a populated contributor_committee_id are returned,
+    * which captures committee/PAC-origin contributions and excludes most
+    * individual receipts.
      *
      * @param committeeId  FEC committee identifier of the RECIPIENT committee
      * @param params       Additional query-string filters (e.g. cycle, min_date)
@@ -146,14 +149,17 @@ public with sharing class FECAPIService {
 
         for (Object item : results) {
             Map<String, Object> row = (Map<String, Object>) item;
-            // Filter: only PAC contributions (entity_type = COMMITTEE)
-            String entityType = (String) safeGet(row, 'entity_type');
-            if (entityType != 'COMMITTEE') {
+            // Filter: only committee-origin contributions.
+            String contributorCommitteeId = (String) safeGet(row, 'contributor_committee_id');
+            if (String.isBlank(contributorCommitteeId)) {
                 continue;
             }
+
+            String entityType = (String) safeGet(row, 'entity_type');
+
             ScheduleAContribution c = new ScheduleAContribution();
             c.transactionId           = (String)  safeGet(row, 'sub_id');
-            c.contributorCommitteeId  = (String)  safeGet(row, 'contributor_committee_id');
+            c.contributorCommitteeId  = contributorCommitteeId;
             c.contributorName         = (String)  safeGet(row, 'contributor_name');
             c.recipientCommitteeId    = committeeId;
             c.contributionAmount      = toDecimal(safeGet(row, 'contribution_receipt_amount'));

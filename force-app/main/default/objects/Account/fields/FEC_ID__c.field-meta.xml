@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>FEC_ID__c</fullName>
+    <description>FEC identifier for the contributor account (typically PAC/committee id such as C00123456).</description>
+    <externalId>false</externalId>
+    <label>FEC ID</label>
+    <length>20</length>
+    <required>false</required>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>
