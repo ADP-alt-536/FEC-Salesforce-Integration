@@ -256,22 +256,21 @@ public with sharing class FECAPIService {
     /** Executes an HTTP GET against the FEC API and returns the parsed JSON body. */
     @TestVisible
     private Map<String, Object> makeGetRequest(String relativePath) {
-        HttpRequest req = new HttpRequest();
-        req.setMethod('GET');
-        req.setTimeout(timeoutMs);
-
-        // Prefer Named Credential; fall back to direct URL + API key
-        String endpoint;
-        if (relativePath.startsWith('callout:')) {
-            endpoint = relativePath;
-        } else {
-            endpoint = NAMED_CREDENTIAL + relativePath;
-        }
-        req.setEndpoint(endpoint);
-        req.setHeader('Accept', 'application/json');
-
         Http http = new Http();
-        HttpResponse res = http.send(req);
+        HttpResponse res;
+
+        // Prefer the non-duplicated path first (strip leading /v1) because many
+        // orgs set the Named Credential endpoint to .../v1. If that fails with
+        // 404, retry once with the original path for orgs that do not include
+        // /v1 in Named Credential configuration.
+        if (relativePath != null && relativePath.startsWith('/v1/')) {
+            res = sendGet(http, relativePath, true);
+            if (res != null && res.getStatusCode() == 404) {
+                res = sendGet(http, relativePath, false);
+            }
+        } else {
+            res = sendGet(http, relativePath, false);
+        }
 
         if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
             throw new FECAPIException(
@@ -282,6 +281,30 @@ public with sharing class FECAPIService {
         }
 
         return (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
+    }
+
+    private HttpResponse sendGet(Http http, String relativePath, Boolean stripV1Prefix) {
+        HttpRequest req = new HttpRequest();
+        req.setMethod('GET');
+        req.setTimeout(timeoutMs);
+
+        String path = relativePath;
+        if (Boolean.valueOf(stripV1Prefix)
+                && path != null
+                && path.startsWith('/v1/')) {
+            path = path.substring(3); // '/v1/foo' -> '/foo'
+        }
+
+        String endpoint;
+        if (path != null && path.startsWith('callout:')) {
+            endpoint = path;
+        } else {
+            endpoint = NAMED_CREDENTIAL + path;
+        }
+        req.setEndpoint(endpoint);
+        req.setHeader('Accept', 'application/json');
+
+        return http.send(req);
     }
 
     private String buildQueryString(String committeeId, Map<String, String> params) {
