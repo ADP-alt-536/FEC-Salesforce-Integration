@@ -21,4 +21,24 @@
         <object>PAC_Contribution__c</object>
         <viewAllRecords>true</viewAllRecords>
     </objectPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>Account.FEC_ID__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>PAC_Contribution__c.Source_Name__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>PAC_Contribution__c.Source_FEC_ID__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>PAC_Contribution__c.Contributor_Committee_Name__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
 </PermissionSet>

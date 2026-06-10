@@ -71,6 +71,7 @@ public with sharing class FECPACContributionSync {
 
         // Build lookup maps: committeeId → Salesforce record Id
         Map<String, Id> committeeIdMap = buildCommitteeIdMap(contributorIds, recipientCommitteeId);
+        Map<String, String> committeeNameMap = buildCommitteeNameMap(contributorIds, recipientCommitteeId);
 
         // Build lookup map: contributor committee FEC id → Account Id
         Map<String, Id> contributorFecIdToAccountMap =
@@ -79,6 +80,7 @@ public with sharing class FECPACContributionSync {
         // Build PAC_Contribution__c records
         List<PAC_Contribution__c> contributions = new List<PAC_Contribution__c>();
         Id recipientCommitteeSfId = committeeIdMap.get(recipientCommitteeId);
+        String recipientCommitteeName = committeeNameMap.get(recipientCommitteeId);
 
         for (FECAPIService.ScheduleAContribution apiC : apiResults) {
             if (String.isBlank(apiC.transactionId)) {
@@ -86,6 +88,10 @@ public with sharing class FECPACContributionSync {
             }
             PAC_Contribution__c rec = new PAC_Contribution__c();
             rec.Transaction_ID__c     = apiC.transactionId;
+            rec.Source_Name__c        = apiC.contributorName;
+            rec.Source_FEC_ID__c      = apiC.contributorCommitteeId;
+            rec.Contributor_Committee_Name__c = committeeNameMap.get(apiC.contributorCommitteeId);
+            rec.Recipient_Committee_Name__c = recipientCommitteeName;
             rec.Contribution_Amount__c = apiC.contributionAmount;
             rec.Contribution_Date__c  = apiC.contributionDate;
             rec.Filing_Date__c        = apiC.filingDate;
@@ -165,6 +171,27 @@ public with sharing class FECPACContributionSync {
             WHERE FEC_Committee_ID__c IN :allIds
         ]) {
             result.put(c.FEC_Committee_ID__c, c.Id);
+        }
+        return result;
+    }
+
+    /**
+     * Returns a map of FEC committee ID → committee name for reporting.
+     */
+    private Map<String, String> buildCommitteeNameMap(
+            Set<String> contributorIds,
+            String recipientCommitteeId) {
+
+        Set<String> allIds = new Set<String>(contributorIds);
+        allIds.add(recipientCommitteeId);
+
+        Map<String, String> result = new Map<String, String>();
+        for (FEC_Committee__c c : [
+            SELECT FEC_Committee_ID__c, Committee_Name__c
+            FROM FEC_Committee__c
+            WHERE FEC_Committee_ID__c IN :allIds
+        ]) {
+            result.put(c.FEC_Committee_ID__c, c.Committee_Name__c);
         }
         return result;
     }

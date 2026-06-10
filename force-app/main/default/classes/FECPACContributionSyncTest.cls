@@ -45,6 +45,12 @@ private class FECPACContributionSyncTest {
             'Only 1 PAC (COMMITTEE entity_type) contribution expected');
         PAC_Contribution__c rec = results[0];
         System.assertEquals('TRN001',    rec.Transaction_ID__c,      'Transaction ID mismatch');
+        System.assertEquals('ACME PAC',  rec.Source_Name__c,         'Source name mismatch');
+        System.assertEquals('C00111111',  rec.Source_FEC_ID__c,       'Source FEC id mismatch');
+        System.assertEquals('ACME PAC Committee', rec.Contributor_Committee_Name__c,
+            'Contributor committee name mismatch');
+        System.assertEquals('Recipient Committee', rec.Recipient_Committee_Name__c,
+            'Recipient committee name mismatch');
         System.assertEquals(5000.00,     rec.Contribution_Amount__c, 'Amount mismatch');
         System.assertEquals(recipientComm.Id, rec.Recipient_Committee__c,
             'Recipient committee should be linked');

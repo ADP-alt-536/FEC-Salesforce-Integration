@@ -135,16 +135,39 @@ public with sharing class FECAPIService {
             return new List<ScheduleAContribution>();
         }
 
-        String queryString = buildQueryString(committeeId, params);
+        Map<String, String> requestParams = (params == null)
+            ? new Map<String, String>()
+            : new Map<String, String>(params);
+
+        String queryString = buildQueryString(committeeId, requestParams);
         Map<String, Object> resp = makeGetRequest('/v1/schedules/schedule_a/' + queryString);
         if (resp == null) {
             return new List<ScheduleAContribution>();
         }
 
         List<ScheduleAContribution> contributions = new List<ScheduleAContribution>();
+        appendScheduleAResults(contributions, committeeId, resp);
+
+        Integer totalPages = getPaginationPages(resp);
+        for (Integer pageNumber = 2; pageNumber <= totalPages; pageNumber++) {
+            requestParams.put('page', String.valueOf(pageNumber));
+            Map<String, Object> pageResp = makeGetRequest(
+                '/v1/schedules/schedule_a/' + buildQueryString(committeeId, requestParams)
+            );
+            appendScheduleAResults(contributions, committeeId, pageResp);
+        }
+
+        return contributions;
+    }
+
+    private void appendScheduleAResults(
+            List<ScheduleAContribution> contributions,
+            String committeeId,
+            Map<String, Object> resp) {
+
         List<Object> results = (List<Object>) resp.get('results');
         if (results == null) {
-            return contributions;
+            return;
         }
 
         for (Object item : results) {
@@ -169,7 +192,12 @@ public with sharing class FECAPIService {
             c.entityType              = entityType;
             contributions.add(c);
         }
-        return contributions;
+    }
+
+    private Integer getPaginationPages(Map<String, Object> resp) {
+        Map<String, Object> pagination = (Map<String, Object>) resp.get('pagination');
+        Integer totalPages = toInteger(safeGet(pagination, 'pages'));
+        return (totalPages == null || totalPages < 1) ? 1 : totalPages;
     }
 
     /**

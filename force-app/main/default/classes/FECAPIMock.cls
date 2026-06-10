@@ -12,6 +12,8 @@ public class FECAPIMock implements HttpCalloutMock {
         COMMITTEE_FINANCIALS_ENDING_CASH,
         COMMITTEE_FINANCIALS_EMPTY,
         SCHEDULE_A_CONTRIBUTIONS,
+            SCHEDULE_A_PAGE1_INDIVIDUALS,
+            SCHEDULE_A_PAGE2_PAC,
         SCHEDULE_A_EMPTY,
         COMMITTEE_DETAILS,
         PRINCIPAL_COMMITTEE,
@@ -45,6 +47,14 @@ public class FECAPIMock implements HttpCalloutMock {
             when SCHEDULE_A_CONTRIBUTIONS {
                 res.setStatusCode(200);
                 res.setBody(scheduleAJson());
+            }
+            when SCHEDULE_A_PAGE1_INDIVIDUALS {
+                res.setStatusCode(200);
+                res.setBody(scheduleAPage1IndividualsJson());
+            }
+            when SCHEDULE_A_PAGE2_PAC {
+                res.setStatusCode(200);
+                res.setBody(scheduleAPage2PacJson());
             }
             when SCHEDULE_A_EMPTY {
                 res.setStatusCode(200);
@@ -115,6 +125,32 @@ public class FECAPIMock implements HttpCalloutMock {
             + '"cycle":2024,'
             + '"entity_type":"INDIVIDUAL"}'
             + '],"pagination":{"count":2}}';
+    }
+
+    private static String scheduleAPage1IndividualsJson() {
+        return '{"results":['
+            + '{"sub_id":"TRN100",'
+            + '"contributor_committee_id":null,'
+            + '"contributor_name":"Jane Donor",'
+            + '"contribution_receipt_amount":100.00,'
+            + '"contribution_receipt_date":"2026-01-10",'
+            + '"load_date":"2026-01-15",'
+            + '"cycle":2026,'
+            + '"entity_type":"INDIVIDUAL"}'
+            + '}],"pagination":{"count":2,"pages":2}}';
+    }
+
+    private static String scheduleAPage2PacJson() {
+        return '{"results":['
+            + '{"sub_id":"TRN200",'
+            + '"contributor_committee_id":"C00430256",'
+            + '"contributor_name":"Example Corporate PAC",'
+            + '"contribution_receipt_amount":2500.00,'
+            + '"contribution_receipt_date":"2026-02-12",'
+            + '"load_date":"2026-02-20",'
+            + '"cycle":2026,'
+            + '"entity_type":"COMMITTEE"}'
+            + '}],"pagination":{"count":2,"pages":2}}';
     }
 
     private static String committeeDetailsJson() {
