@@ -85,7 +85,7 @@ public with sharing class FECAPIService {
         if (String.isBlank(committeeId)) {
             return null;
         }
-        String path = '/committee/' + EncodingUtil.urlEncode(committeeId, 'UTF-8')
+        String path = '/v1/committee/' + EncodingUtil.urlEncode(committeeId, 'UTF-8')
                       + '/totals/?cycle=' + cycle
                       + '&api_key=' + EncodingUtil.urlEncode(apiKey, 'UTF-8');
 
@@ -105,7 +105,12 @@ public with sharing class FECAPIService {
         fin.committeeName       = (String)  safeGet(row, 'committee_name');
         fin.committeeType       = mapCommitteeType((String) safeGet(row, 'committee_type_full'));
         fin.designation         = (String)  safeGet(row, 'designation_full');
-        fin.cashOnHand          = toDecimal(safeGet(row, 'cash_on_hand_end_period'));
+        fin.cashOnHand          = firstDecimal(row, new List<String>{
+            'ending_cash_on_hand',
+            'cash_on_hand_end_period',
+            'last_cash_on_hand_end_period',
+            'cash_on_hand_close_ytd'
+        });
         fin.totalReceipts       = toDecimal(safeGet(row, 'receipts'));
         fin.totalDisbursements  = toDecimal(safeGet(row, 'disbursements'));
         fin.cycle               = cycle;
@@ -113,9 +118,10 @@ public with sharing class FECAPIService {
     }
 
     /**
-     * Retrieves Schedule A (receipts) contributions for the given committee.
-     * Only records where contributor_type = 'COMMITTEE' (i.e. PAC-to-candidate)
-     * are returned.
+    * Retrieves Schedule A (receipts) contributions for the given committee.
+    * Only records with a populated contributor_committee_id are returned,
+    * which captures committee/PAC-origin contributions and excludes most
+    * individual receipts.
      *
      * @param committeeId  FEC committee identifier of the RECIPIENT committee
      * @param params       Additional query-string filters (e.g. cycle, min_date)
@@ -130,7 +136,7 @@ public with sharing class FECAPIService {
         }
 
         String queryString = buildQueryString(committeeId, params);
-        Map<String, Object> resp = makeGetRequest('/schedules/schedule_a/' + queryString);
+        Map<String, Object> resp = makeGetRequest('/v1/schedules/schedule_a/' + queryString);
         if (resp == null) {
             return new List<ScheduleAContribution>();
         }
@@ -143,14 +149,17 @@ public with sharing class FECAPIService {
 
         for (Object item : results) {
             Map<String, Object> row = (Map<String, Object>) item;
-            // Filter: only PAC contributions (entity_type = COMMITTEE)
-            String entityType = (String) safeGet(row, 'entity_type');
-            if (entityType != 'COMMITTEE') {
+            // Filter: only committee-origin contributions.
+            String contributorCommitteeId = (String) safeGet(row, 'contributor_committee_id');
+            if (String.isBlank(contributorCommitteeId)) {
                 continue;
             }
+
+            String entityType = (String) safeGet(row, 'entity_type');
+
             ScheduleAContribution c = new ScheduleAContribution();
             c.transactionId           = (String)  safeGet(row, 'sub_id');
-            c.contributorCommitteeId  = (String)  safeGet(row, 'contributor_committee_id');
+            c.contributorCommitteeId  = contributorCommitteeId;
             c.contributorName         = (String)  safeGet(row, 'contributor_name');
             c.recipientCommitteeId    = committeeId;
             c.contributionAmount      = toDecimal(safeGet(row, 'contribution_receipt_amount'));
@@ -173,7 +182,7 @@ public with sharing class FECAPIService {
         if (String.isBlank(committeeId)) {
             return null;
         }
-        String path = '/committee/' + EncodingUtil.urlEncode(committeeId, 'UTF-8')
+        String path = '/v1/committee/' + EncodingUtil.urlEncode(committeeId, 'UTF-8')
                       + '/?api_key=' + EncodingUtil.urlEncode(apiKey, 'UTF-8');
         Map<String, Object> resp = makeGetRequest(path);
         if (resp == null) {
@@ -197,7 +206,7 @@ public with sharing class FECAPIService {
         if (String.isBlank(candidateId)) {
             return null;
         }
-        String path = '/candidate/' + EncodingUtil.urlEncode(candidateId, 'UTF-8')
+        String path = '/v1/candidate/' + EncodingUtil.urlEncode(candidateId, 'UTF-8')
                       + '/committees/?designation=P&cycle=' + cycle
                       + '&api_key=' + EncodingUtil.urlEncode(apiKey, 'UTF-8');
         Map<String, Object> resp = makeGetRequest(path);
@@ -253,22 +262,21 @@ public with sharing class FECAPIService {
     /** Executes an HTTP GET against the FEC API and returns the parsed JSON body. */
     @TestVisible
     private Map<String, Object> makeGetRequest(String relativePath) {
-        HttpRequest req = new HttpRequest();
-        req.setMethod('GET');
-        req.setTimeout(timeoutMs);
-
-        // Prefer Named Credential; fall back to direct URL + API key
-        String endpoint;
-        if (relativePath.startsWith('callout:')) {
-            endpoint = relativePath;
-        } else {
-            endpoint = NAMED_CREDENTIAL + relativePath;
-        }
-        req.setEndpoint(endpoint);
-        req.setHeader('Accept', 'application/json');
-
         Http http = new Http();
-        HttpResponse res = http.send(req);
+        HttpResponse res;
+
+        // Prefer the non-duplicated path first (strip leading /v1) because many
+        // orgs set the Named Credential endpoint to .../v1. If that fails with
+        // 404, retry once with the original path for orgs that do not include
+        // /v1 in Named Credential configuration.
+        if (relativePath != null && relativePath.startsWith('/v1/')) {
+            res = sendGet(http, relativePath, true);
+            if (res != null && res.getStatusCode() == 404) {
+                res = sendGet(http, relativePath, false);
+            }
+        } else {
+            res = sendGet(http, relativePath, false);
+        }
 
         if (res.getStatusCode() < 200 || res.getStatusCode() >= 300) {
             throw new FECAPIException(
@@ -279,6 +287,30 @@ public with sharing class FECAPIService {
         }
 
         return (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
+    }
+
+    private HttpResponse sendGet(Http http, String relativePath, Boolean stripV1Prefix) {
+        HttpRequest req = new HttpRequest();
+        req.setMethod('GET');
+        req.setTimeout(timeoutMs);
+
+        String path = relativePath;
+        if (Boolean.valueOf(stripV1Prefix)
+                && path != null
+                && path.startsWith('/v1/')) {
+            path = path.substring(3); // '/v1/foo' -> '/foo'
+        }
+
+        String endpoint;
+        if (path != null && path.startsWith('callout:')) {
+            endpoint = path;
+        } else {
+            endpoint = NAMED_CREDENTIAL + path;
+        }
+        req.setEndpoint(endpoint);
+        req.setHeader('Accept', 'application/json');
+
+        return http.send(req);
     }
 
     private String buildQueryString(String committeeId, Map<String, String> params) {
@@ -330,6 +362,20 @@ public with sharing class FECAPIService {
         if (val instanceof Long)    { return ((Long)    val).intValue(); }
         try { return Integer.valueOf(String.valueOf(val)); }
         catch (Exception e) { return null; }
+    }
+
+    /** Returns the first non-null decimal found among the given JSON keys. */
+    private static Decimal firstDecimal(Map<String, Object> row, List<String> keys) {
+        if (row == null || keys == null) {
+            return null;
+        }
+        for (String key : keys) {
+            Decimal parsed = toDecimal(safeGet(row, key));
+            if (parsed != null) {
+                return parsed;
+            }
+        }
+        return null;
     }
 
     /**

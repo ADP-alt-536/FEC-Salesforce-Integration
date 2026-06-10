@@ -9,6 +9,7 @@ public class FECAPIMock implements HttpCalloutMock {
 
     public enum MockType {
         COMMITTEE_FINANCIALS,
+        COMMITTEE_FINANCIALS_ENDING_CASH,
         COMMITTEE_FINANCIALS_EMPTY,
         SCHEDULE_A_CONTRIBUTIONS,
         SCHEDULE_A_EMPTY,
@@ -32,6 +33,10 @@ public class FECAPIMock implements HttpCalloutMock {
             when COMMITTEE_FINANCIALS {
                 res.setStatusCode(200);
                 res.setBody(committeeFinancialsJson());
+            }
+            when COMMITTEE_FINANCIALS_ENDING_CASH {
+                res.setStatusCode(200);
+                res.setBody(committeeFinancialsEndingCashJson());
             }
             when COMMITTEE_FINANCIALS_EMPTY {
                 res.setStatusCode(200);
@@ -75,6 +80,18 @@ public class FECAPIMock implements HttpCalloutMock {
             + '"cash_on_hand_end_period":500000.00,'
             + '"receipts":1000000.00,'
             + '"disbursements":500000.00,'
+            + '"cycle":2024'
+            + '}],"pagination":{"count":1}}';
+    }
+
+    private static String committeeFinancialsEndingCashJson() {
+        return '{"results":[{'
+            + '"committee_name":"Test Committee",'
+            + '"committee_type_full":"House",'
+            + '"designation_full":"Authorized",'
+            + '"ending_cash_on_hand":750000.00,'
+            + '"receipts":1200000.00,'
+            + '"disbursements":450000.00,'
             + '"cycle":2024'
             + '}],"pagination":{"count":1}}';
     }

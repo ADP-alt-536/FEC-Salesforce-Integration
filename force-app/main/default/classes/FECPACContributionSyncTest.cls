@@ -103,6 +103,40 @@ private class FECPACContributionSyncTest {
     }
 
     @IsTest
+    static void testSyncContributions_linksAccountByFecId() {
+        FEC_Committee__c contributorComm = new FEC_Committee__c(
+            FEC_Committee_ID__c = 'C00111111',
+            Name                = 'ACME PAC Committee'
+        );
+        insert contributorComm;
+
+        FEC_Committee__c recipientComm = new FEC_Committee__c(
+            FEC_Committee_ID__c = 'C00177436',
+            Name                = 'Recipient Committee'
+        );
+        insert recipientComm;
+
+        Account acc = new Account(Name = 'ACME Corp by FEC ID');
+        acc.put('FEC_ID__c', 'C00111111');
+        insert acc;
+
+        // Mock only the Schedule A call; committee records already exist.
+        Test.setMock(HttpCalloutMock.class,
+            new FECAPIMock(FECAPIMock.MockType.SCHEDULE_A_CONTRIBUTIONS));
+
+        Test.startTest();
+        FECAPIService apiSvc = testApiService();
+        FECPACContributionSync sync = new FECPACContributionSync(apiSvc, new FECCommitteeSync(apiSvc));
+        List<PAC_Contribution__c> results =
+            sync.syncContributions('C00177436', 2024, null);
+        Test.stopTest();
+
+        System.assertEquals(1, results.size());
+        System.assertEquals(acc.Id, results[0].Contributing_Account__c,
+            'Contributing_Account__c should be set by Account.FEC_ID__c');
+    }
+
+    @IsTest
     static void testSyncContributions_linksLegislator() {
         Legislator__c leg = new Legislator__c(
             FEC_Candidate_ID__c = 'H00001234'
