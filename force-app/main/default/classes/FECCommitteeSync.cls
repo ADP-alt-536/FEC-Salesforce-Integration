@@ -131,7 +131,7 @@ public with sharing class FECCommitteeSync {
             rec.Cash_on_Hand__c        = fin.cashOnHand;
             rec.Total_Receipts__c      = fin.totalReceipts;
             rec.Total_Disbursements__c = fin.totalDisbursements;
-            rec.Cycle__c               = fin.cycle;
+            setElectionCycle(rec, fin.cycle);
         }
 
         if (legislatorId != null) {
@@ -146,5 +146,47 @@ public with sharing class FECCommitteeSync {
         }
 
         return rec;
+    }
+
+    private static void setElectionCycle(FEC_Committee__c rec, Integer cycle) {
+        if (cycle == null) {
+            return;
+        }
+        setElectionCycle(rec, String.valueOf(cycle));
+    }
+
+    private static void setElectionCycle(FEC_Committee__c rec, String cycleValue) {
+        if (String.isBlank(cycleValue)) {
+            return;
+        }
+
+        Map<String, Schema.SObjectField> fieldsByApiName =
+            Schema.SObjectType.FEC_Committee__c.fields.getMap();
+        String fieldApiName;
+
+        if (fieldsByApiName.containsKey('Election_Cycle__c')) {
+            fieldApiName = 'Election_Cycle__c';
+        } else if (fieldsByApiName.containsKey('Cycle__c')) {
+            fieldApiName = 'Cycle__c';
+        } else {
+            return;
+        }
+
+        Schema.DisplayType fieldType =
+            fieldsByApiName.get(fieldApiName).getDescribe().getType();
+
+        if (fieldType == Schema.DisplayType.String
+                || fieldType == Schema.DisplayType.TextArea
+                || fieldType == Schema.DisplayType.EncryptedString) {
+            rec.put(fieldApiName, cycleValue);
+        } else {
+            try {
+                rec.put(fieldApiName, Integer.valueOf(cycleValue));
+            } catch (Exception ex) {
+                System.debug(LoggingLevel.WARN,
+                    'FECCommitteeSync.setElectionCycle: unable to parse cycle value "'
+                    + cycleValue + '" for numeric field ' + fieldApiName);
+            }
+        }
     }
 }

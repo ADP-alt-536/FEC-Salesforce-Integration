@@ -17,7 +17,7 @@ private class FECPACContributionSyncTest {
     }
 
     @IsTest
-    static void testSyncContributions_createsPACContribution() {
+    static void testSyncContributions_skipsContributionWithoutAccountMatch() {
         // Ensure the recipient FEC_Committee__c exists so we can look it up
         FEC_Committee__c recipientComm = new FEC_Committee__c(
             FEC_Committee_ID__c = 'C00177436',
@@ -41,19 +41,8 @@ private class FECPACContributionSyncTest {
             sync.syncContributions('C00177436', 2024, null);
         Test.stopTest();
 
-        System.assertEquals(1, results.size(),
-            'Only 1 PAC (COMMITTEE entity_type) contribution expected');
-        PAC_Contribution__c rec = results[0];
-        System.assertEquals('TRN001',    rec.Transaction_ID__c,      'Transaction ID mismatch');
-        System.assertEquals('ACME PAC',  rec.Source_Name__c,         'Source name mismatch');
-        System.assertEquals('C00111111',  rec.Source_FEC_ID__c,       'Source FEC id mismatch');
-        System.assertEquals('ACME PAC Committee', rec.Contributor_Committee_Name__c,
-            'Contributor committee name mismatch');
-        System.assertEquals('Recipient Committee', rec.Recipient_Committee_Name__c,
-            'Recipient committee name mismatch');
-        System.assertEquals(5000.00,     rec.Contribution_Amount__c, 'Amount mismatch');
-        System.assertEquals(recipientComm.Id, rec.Recipient_Committee__c,
-            'Recipient committee should be linked');
+        System.assertEquals(0, results.size(),
+            'PAC contribution should be skipped when no Account.FEC_ID__c match exists');
     }
 
     @IsTest
@@ -72,18 +61,18 @@ private class FECPACContributionSyncTest {
     }
 
     @IsTest
-    static void testSyncContributions_linksAccount() {
-        FEC_Committee__c contributorComm = new FEC_Committee__c(
-            FEC_Committee_ID__c = 'C00111111',
-            Name                = 'ACME PAC Committee'
-        );
-        insert contributorComm;
-
+    static void testSyncContributions_skipsCorporatePacFallbackOnlyAccount() {
         FEC_Committee__c recipientComm = new FEC_Committee__c(
             FEC_Committee_ID__c = 'C00177436',
             Name                = 'Recipient Committee'
         );
         insert recipientComm;
+
+        FEC_Committee__c contributorComm = new FEC_Committee__c(
+            FEC_Committee_ID__c = 'C00111111',
+            Name                = 'ACME PAC Committee'
+        );
+        insert contributorComm;
 
         Account acc = new Account(
             Name                     = 'ACME Corp',
@@ -103,9 +92,8 @@ private class FECPACContributionSyncTest {
             sync.syncContributions('C00177436', 2024, null);
         Test.stopTest();
 
-        System.assertEquals(1, results.size());
-        System.assertEquals(acc.Id, results[0].Contributing_Account__c,
-            'Contributing_Account__c should be set from Corporate_PAC_Committee__c lookup');
+        System.assertEquals(0, results.size(),
+            'PAC contribution should be skipped when only Corporate_PAC_Committee__c is populated');
     }
 
     @IsTest
@@ -138,6 +126,13 @@ private class FECPACContributionSyncTest {
         Test.stopTest();
 
         System.assertEquals(1, results.size());
+        System.assertEquals('TRN001', results[0].Transaction_ID__c);
+        System.assertEquals('ACME PAC', results[0].Source_Name__c);
+        System.assertEquals('C00111111', results[0].Source_FEC_ID__c);
+        System.assertEquals('ACME PAC Committee', results[0].Contributor_Committee_Name__c);
+        System.assertEquals('Recipient Committee', results[0].Recipient_Committee_Name__c);
+        System.assertEquals(5000.00, results[0].Contribution_Amount__c);
+        System.assertEquals(recipientComm.Id, results[0].Recipient_Committee__c);
         System.assertEquals(acc.Id, results[0].Contributing_Account__c,
             'Contributing_Account__c should be set by Account.FEC_ID__c');
     }
@@ -160,6 +155,43 @@ private class FECPACContributionSyncTest {
                 new FECAPIMock(FECAPIMock.MockType.SCHEDULE_A_CONTRIBUTIONS),
                 new FECAPIMock(FECAPIMock.MockType.COMMITTEE_FINANCIALS)
             }));
+
+        Test.startTest();
+        FECAPIService apiSvc = testApiService();
+        FECPACContributionSync sync = new FECPACContributionSync(apiSvc, new FECCommitteeSync(apiSvc));
+        List<PAC_Contribution__c> results =
+            sync.syncContributions('C00177436', 2024, leg.Id);
+        Test.stopTest();
+
+        System.assertEquals(0, results.size(),
+            'Legislator should not be linked when no Account.FEC_ID__c-matched contribution is created');
+    }
+
+    @IsTest
+    static void testSyncContributions_linksLegislatorWhenAccountMatchesFecId() {
+        Legislator__c leg = new Legislator__c(
+            FEC_Candidate_ID__c = 'H00001234'
+        );
+        insert leg;
+
+        FEC_Committee__c contributorComm = new FEC_Committee__c(
+            FEC_Committee_ID__c = 'C00111111',
+            Name                = 'ACME PAC Committee'
+        );
+        insert contributorComm;
+
+        FEC_Committee__c recipientComm = new FEC_Committee__c(
+            FEC_Committee_ID__c = 'C00177436',
+            Name                = 'Recipient Committee'
+        );
+        insert recipientComm;
+
+        Account acc = new Account(Name = 'ACME Corp by FEC ID');
+        acc.put('FEC_ID__c', 'C00111111');
+        insert acc;
+
+        Test.setMock(HttpCalloutMock.class,
+            new FECAPIMock(FECAPIMock.MockType.SCHEDULE_A_CONTRIBUTIONS));
 
         Test.startTest();
         FECAPIService apiSvc = testApiService();

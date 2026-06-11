@@ -14,6 +14,7 @@ public class FECAPIMock implements HttpCalloutMock {
         SCHEDULE_A_CONTRIBUTIONS,
             SCHEDULE_A_PAGE1_INDIVIDUALS,
             SCHEDULE_A_PAGE2_PAC,
+            SCHEDULE_A_CONTRIBUTOR_ID_ONLY,
         SCHEDULE_A_EMPTY,
         COMMITTEE_DETAILS,
         PRINCIPAL_COMMITTEE,
@@ -55,6 +56,10 @@ public class FECAPIMock implements HttpCalloutMock {
             when SCHEDULE_A_PAGE2_PAC {
                 res.setStatusCode(200);
                 res.setBody(scheduleAPage2PacJson());
+            }
+            when SCHEDULE_A_CONTRIBUTOR_ID_ONLY {
+                res.setStatusCode(200);
+                res.setBody(scheduleAContributorIdOnlyJson());
             }
             when SCHEDULE_A_EMPTY {
                 res.setStatusCode(200);
@@ -137,7 +142,7 @@ public class FECAPIMock implements HttpCalloutMock {
             + '"load_date":"2026-01-15",'
             + '"cycle":2026,'
             + '"entity_type":"INDIVIDUAL"}'
-            + '}],"pagination":{"count":2,"pages":2}}';
+            + '],"pagination":{"count":2,"pages":2}}';
     }
 
     private static String scheduleAPage2PacJson() {
@@ -150,7 +155,21 @@ public class FECAPIMock implements HttpCalloutMock {
             + '"load_date":"2026-02-20",'
             + '"cycle":2026,'
             + '"entity_type":"COMMITTEE"}'
-            + '}],"pagination":{"count":2,"pages":2}}';
+            + '],"pagination":{"count":2,"pages":2}}';
+    }
+
+    private static String scheduleAContributorIdOnlyJson() {
+        return '{"results":['
+            + '{"sub_id":"TRN300",'
+            + '"contributor_committee_id":null,'
+            + '"contributor_id":"C00430256",'
+            + '"contributor_name":"Contributor via contributor_id",'
+            + '"contribution_receipt_amount":1500.00,'
+            + '"contribution_receipt_date":"2026-03-10",'
+            + '"load_date":"2026-03-20",'
+            + '"cycle":2026,'
+            + '"entity_type":"COMMITTEE"}'
+            + '],"pagination":{"count":1,"pages":1}}';
     }
 
     private static String committeeDetailsJson() {

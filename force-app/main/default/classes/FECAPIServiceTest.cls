@@ -131,6 +131,25 @@ private class FECAPIServiceTest {
     }
 
     @IsTest
+    static void testGetScheduleAContributions_usesContributorIdFallback() {
+        Test.setMock(HttpCalloutMock.class,
+            new FECAPIMock(FECAPIMock.MockType.SCHEDULE_A_CONTRIBUTOR_ID_ONLY));
+
+        Test.startTest();
+        List<FECAPIService.ScheduleAContribution> contribs =
+            testService().getScheduleAContributions('C00503110',
+                new Map<String, String>{'cycle' => '2026'});
+        Test.stopTest();
+
+        System.assertEquals(1, contribs.size(),
+            'Rows with contributor_id committee values should be retained');
+        System.assertEquals('C00430256', contribs[0].contributorCommitteeId,
+            'contributor_id should be used when contributor_committee_id is blank');
+        System.assertEquals('TRN300', contribs[0].transactionId,
+            'Fallback row transaction should be returned');
+    }
+
+    @IsTest
     static void testGetScheduleAContributions_nullCommitteeId() {
         Test.startTest();
         List<FECAPIService.ScheduleAContribution> contribs =
