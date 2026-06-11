@@ -30,6 +30,7 @@ private class FECCommitteeSyncTest {
         System.assertEquals(500000.00,        result.Cash_on_Hand__c);
         System.assertEquals(1000000.00,       result.Total_Receipts__c);
         System.assertEquals(500000.00,        result.Total_Disbursements__c);
+        System.assertEquals('2024',           String.valueOf(result.get('Cycle__c')));
         System.assertNotEquals(null,          result.Last_Sync_Date__c);
     }
 

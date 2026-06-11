@@ -11,11 +11,19 @@
  *   1. Query Schedule A contributions for a recipient committee from the FEC API.
  *   2. Ensure both contributor and recipient FEC_Committee__c records exist.
  *   3. Upsert PAC_Contribution__c records using Transaction_ID__c as the external ID.
- *   4. Link Contributing_Account__c by contributor FEC id:
- *      - Primary: Account.FEC_ID__c = contributor committee FEC id
- *      - Fallback: Account.Corporate_PAC_Committee__c lookup mapping
+ *   4. Only create PAC_Contribution__c rows when the contributor maps to an
+ *      Account via Account.FEC_ID__c, and set Contributing_Account__c.
  */
 public with sharing class FECPACContributionSync {
+
+    public class SyncWindowResult {
+        public Integer startPage;
+        public Integer endPage;
+        public Integer totalPages;
+        public Integer recordsUpserted;
+        public Boolean hasMorePages;
+        public Integer nextPage;
+    }
 
     private FECAPIService    apiService;
     private FECCommitteeSync committeeSync;
@@ -54,7 +62,61 @@ public with sharing class FECPACContributionSync {
         List<FECAPIService.ScheduleAContribution> apiResults =
             apiService.getScheduleAContributions(recipientCommitteeId, params);
 
-        if (apiResults.isEmpty()) {
+        return syncContributionsFromApiResults(
+            recipientCommitteeId,
+            cycle,
+            recipientLegislatorId,
+            apiResults
+        );
+    }
+
+    /**
+     * Syncs a bounded page window so large committee cycles can be processed
+     * across chained queueables without CPU timeout.
+     */
+    public SyncWindowResult syncContributionsWindow(
+            String recipientCommitteeId,
+            Integer cycle,
+            Id recipientLegislatorId,
+            Integer startPage,
+            Integer maxPagesPerRun) {
+
+        Map<String, String> params = new Map<String, String>{
+            'cycle' => String.valueOf(cycle)
+        };
+
+        FECAPIService.ScheduleAWindowResult window =
+            apiService.getScheduleAContributionsWindow(
+                recipientCommitteeId,
+                params,
+                startPage,
+                maxPagesPerRun
+            );
+
+        List<PAC_Contribution__c> upserted = syncContributionsFromApiResults(
+            recipientCommitteeId,
+            cycle,
+            recipientLegislatorId,
+            window.contributions
+        );
+
+        SyncWindowResult out = new SyncWindowResult();
+        out.startPage = window.startPage;
+        out.endPage = window.endPage;
+        out.totalPages = window.totalPages;
+        out.recordsUpserted = upserted.size();
+        out.hasMorePages = (window.endPage < window.totalPages);
+        out.nextPage = out.hasMorePages ? (window.endPage + 1) : null;
+        return out;
+    }
+
+    private List<PAC_Contribution__c> syncContributionsFromApiResults(
+            String recipientCommitteeId,
+            Integer cycle,
+            Id recipientLegislatorId,
+            List<FECAPIService.ScheduleAContribution> apiResults) {
+
+        if (apiResults == null || apiResults.isEmpty()) {
             return new List<PAC_Contribution__c>();
         }
 
@@ -71,21 +133,47 @@ public with sharing class FECPACContributionSync {
 
         // Build lookup maps: committeeId → Salesforce record Id
         Map<String, Id> committeeIdMap = buildCommitteeIdMap(contributorIds, recipientCommitteeId);
+        Map<String, String> committeeNameMap = buildCommitteeNameMap(contributorIds, recipientCommitteeId);
 
         // Build lookup map: contributor committee FEC id → Account Id
         Map<String, Id> contributorFecIdToAccountMap =
-            buildContributorAccountMap(contributorIds, committeeIdMap);
+            buildContributorAccountMap(contributorIds);
 
         // Build PAC_Contribution__c records
         List<PAC_Contribution__c> contributions = new List<PAC_Contribution__c>();
+        Set<String> seenTransactionIds = new Set<String>();
+        Integer duplicateTransactionCount = 0;
+        Integer skippedUnlinkedContributorCount = 0;
         Id recipientCommitteeSfId = committeeIdMap.get(recipientCommitteeId);
+        String recipientCommitteeName = committeeNameMap.get(recipientCommitteeId);
+        Map<String, Schema.SObjectField> pacFields =
+            Schema.SObjectType.PAC_Contribution__c.fields.getMap();
 
         for (FECAPIService.ScheduleAContribution apiC : apiResults) {
             if (String.isBlank(apiC.transactionId)) {
                 continue;
             }
+            if (seenTransactionIds.contains(apiC.transactionId)) {
+                duplicateTransactionCount++;
+                continue;
+            }
+
+            Id contributingAccountId = String.isNotBlank(apiC.contributorCommitteeId)
+                ? contributorFecIdToAccountMap.get(apiC.contributorCommitteeId)
+                : null;
+            if (contributingAccountId == null) {
+                skippedUnlinkedContributorCount++;
+                continue;
+            }
+
+            seenTransactionIds.add(apiC.transactionId);
+
             PAC_Contribution__c rec = new PAC_Contribution__c();
             rec.Transaction_ID__c     = apiC.transactionId;
+            rec.Source_Name__c        = apiC.contributorName;
+            rec.Source_FEC_ID__c      = apiC.contributorCommitteeId;
+            rec.Contributor_Committee_Name__c = committeeNameMap.get(apiC.contributorCommitteeId);
+            rec.Recipient_Committee_Name__c = recipientCommitteeName;
             rec.Contribution_Amount__c = apiC.contributionAmount;
             rec.Contribution_Date__c  = apiC.contributionDate;
             rec.Filing_Date__c        = apiC.filingDate;
@@ -93,24 +181,35 @@ public with sharing class FECPACContributionSync {
             rec.Last_Sync_Date__c     = Datetime.now();
             rec.Recipient_Committee__c = recipientCommitteeSfId;
 
-            if (recipientLegislatorId != null) {
+                if (recipientLegislatorId != null
+                    && pacFields.containsKey('Recipient_Legislator__c')) {
                 rec.Recipient_Legislator__c = recipientLegislatorId;
             }
 
             if (String.isNotBlank(apiC.contributorCommitteeId)) {
                 Id contribSfId = committeeIdMap.get(apiC.contributorCommitteeId);
                 rec.Contributor_Committee__c = contribSfId;
-                if (contributorFecIdToAccountMap.containsKey(apiC.contributorCommitteeId)) {
-                    rec.Contributing_Account__c =
-                        contributorFecIdToAccountMap.get(apiC.contributorCommitteeId);
-                }
             }
+            rec.Contributing_Account__c = contributingAccountId;
 
             contributions.add(rec);
         }
 
         if (!contributions.isEmpty()) {
             upsert contributions Transaction_ID__c;
+        }
+
+        if (duplicateTransactionCount > 0) {
+            System.debug(LoggingLevel.WARN,
+                'FECPACContributionSync: skipped duplicate transaction ids in batch. committee='
+                + recipientCommitteeId
+                + ' duplicatesSkipped=' + duplicateTransactionCount);
+        }
+        if (skippedUnlinkedContributorCount > 0) {
+            System.debug(LoggingLevel.DEBUG,
+                'FECPACContributionSync: skipped contributions without Account.FEC_ID__c match. committee='
+                + recipientCommitteeId
+                + ' skippedUnlinked=' + skippedUnlinkedContributorCount);
         }
 
         return contributions;
@@ -170,15 +269,32 @@ public with sharing class FECPACContributionSync {
     }
 
     /**
-     * Returns a map of contributor committee FEC id -> Account Id.
-     *
-     * Mapping priority:
-     * 1) Account.FEC_ID__c
-     * 2) Account.Corporate_PAC_Committee__c (fallback)
+     * Returns a map of FEC committee ID → committee name for reporting.
+     */
+    private Map<String, String> buildCommitteeNameMap(
+            Set<String> contributorIds,
+            String recipientCommitteeId) {
+
+        Set<String> allIds = new Set<String>(contributorIds);
+        allIds.add(recipientCommitteeId);
+
+        Map<String, String> result = new Map<String, String>();
+        for (FEC_Committee__c c : [
+            SELECT FEC_Committee_ID__c, Committee_Name__c
+            FROM FEC_Committee__c
+            WHERE FEC_Committee_ID__c IN :allIds
+        ]) {
+            result.put(c.FEC_Committee_ID__c, c.Committee_Name__c);
+        }
+        return result;
+    }
+
+    /**
+     * Returns a map of contributor committee FEC id -> Account Id using
+     * Account.FEC_ID__c only.
      */
     private Map<String, Id> buildContributorAccountMap(
-            Set<String> contributorFecIds,
-            Map<String, Id> committeeIdMap) {
+            Set<String> contributorFecIds) {
 
         Map<String, Id> result = new Map<String, Id>();
         if (contributorFecIds == null || contributorFecIds.isEmpty()) {
@@ -216,37 +332,6 @@ public with sharing class FECPACContributionSync {
                 }
 
                 result.put(acc.FEC_ID__c, acc.Id);
-            }
-        }
-
-        // Fallback mapping via Account.Corporate_PAC_Committee__c lookup.
-        if (accountFields.containsKey('Corporate_PAC_Committee__c')) {
-            Set<Id> contributorCommitteeSfIds = new Set<Id>();
-            Map<Id, String> committeeSfIdToFecId = new Map<Id, String>();
-
-            for (String contributorFecId : contributorFecIds) {
-                Id committeeSfId = committeeIdMap.get(contributorFecId);
-                if (committeeSfId != null) {
-                    contributorCommitteeSfIds.add(committeeSfId);
-                    committeeSfIdToFecId.put(committeeSfId, contributorFecId);
-                }
-            }
-
-            if (!contributorCommitteeSfIds.isEmpty()) {
-                for (Account acc : [
-                    SELECT Id, Corporate_PAC_Committee__c
-                    FROM Account
-                    WHERE Corporate_PAC_Committee__c IN :contributorCommitteeSfIds
-                ]) {
-                    String contributorFecId =
-                        committeeSfIdToFecId.get(acc.Corporate_PAC_Committee__c);
-                    if (String.isBlank(contributorFecId)) {
-                        continue;
-                    }
-                    if (!result.containsKey(contributorFecId)) {
-                        result.put(contributorFecId, acc.Id);
-                    }
-                }
             }
         }
 

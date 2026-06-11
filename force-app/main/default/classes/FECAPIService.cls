@@ -40,6 +40,14 @@ public with sharing class FECAPIService {
         public String  entityType; // PAC, INDIVIDUAL, etc.
     }
 
+    /** Paged window response for Schedule A sync in chained queueables. */
+    public class ScheduleAWindowResult {
+        public List<ScheduleAContribution> contributions;
+        public Integer totalPages;
+        public Integer startPage;
+        public Integer endPage;
+    }
+
     /** Lightweight wrapper used when a callout responds with a non-2xx status. */
     public class FECAPIException extends Exception {}
 
@@ -47,6 +55,7 @@ public with sharing class FECAPIService {
 
     private static final String NAMED_CREDENTIAL = 'callout:FEC_API';
     private static final String SETTINGS_KEY     = 'Default';
+    private static final Integer SCHEDULE_A_SAMPLE_ROWS = 3;
 
     private String  apiKey;
     private String  baseUrl;
@@ -135,27 +144,144 @@ public with sharing class FECAPIService {
             return new List<ScheduleAContribution>();
         }
 
-        String queryString = buildQueryString(committeeId, params);
+        Map<String, String> requestParams = (params == null)
+            ? new Map<String, String>()
+            : new Map<String, String>(params);
+
+        String queryString = buildQueryString(committeeId, requestParams);
         Map<String, Object> resp = makeGetRequest('/v1/schedules/schedule_a/' + queryString);
         if (resp == null) {
             return new List<ScheduleAContribution>();
         }
 
+        Integer totalPages = getPaginationPages(resp);
         List<ScheduleAContribution> contributions = new List<ScheduleAContribution>();
+        appendScheduleAResults(contributions, committeeId, resp, 1, totalPages);
+
+        for (Integer pageNumber = 2; pageNumber <= totalPages; pageNumber++) {
+            requestParams.put('page', String.valueOf(pageNumber));
+            Map<String, Object> pageResp = makeGetRequest(
+                '/v1/schedules/schedule_a/' + buildQueryString(committeeId, requestParams)
+            );
+            appendScheduleAResults(contributions, committeeId, pageResp, pageNumber, totalPages);
+        }
+
+        return contributions;
+    }
+
+    /**
+     * Retrieves a bounded page window of Schedule A records.
+     * Designed for chained async processing to avoid CPU and callout limits.
+     */
+    public ScheduleAWindowResult getScheduleAContributionsWindow(
+            String committeeId,
+            Map<String, String> params,
+            Integer startPage,
+            Integer maxPages) {
+
+        ScheduleAWindowResult out = new ScheduleAWindowResult();
+        out.contributions = new List<ScheduleAContribution>();
+        out.totalPages = 1;
+        out.startPage = (startPage == null || startPage < 1) ? 1 : startPage;
+        out.endPage = out.startPage;
+
+        if (String.isBlank(committeeId)) {
+            return out;
+        }
+
+        Integer windowSize = (maxPages == null || maxPages < 1) ? 1 : maxPages;
+        Map<String, String> requestParams = (params == null)
+            ? new Map<String, String>()
+            : new Map<String, String>(params);
+
+        requestParams.put('page', String.valueOf(out.startPage));
+        Map<String, Object> firstResp = makeGetRequest(
+            '/v1/schedules/schedule_a/' + buildQueryString(committeeId, requestParams)
+        );
+        out.totalPages = getPaginationPages(firstResp);
+        appendScheduleAResults(out.contributions, committeeId, firstResp, out.startPage, out.totalPages);
+
+        Integer lastPageToFetch = Math.min(out.totalPages, out.startPage + windowSize - 1);
+        for (Integer pageNumber = out.startPage + 1; pageNumber <= lastPageToFetch; pageNumber++) {
+            requestParams.put('page', String.valueOf(pageNumber));
+            Map<String, Object> pageResp = makeGetRequest(
+                '/v1/schedules/schedule_a/' + buildQueryString(committeeId, requestParams)
+            );
+            appendScheduleAResults(out.contributions, committeeId, pageResp, pageNumber, out.totalPages);
+        }
+
+        out.endPage = lastPageToFetch;
+        return out;
+    }
+
+    private void appendScheduleAResults(
+            List<ScheduleAContribution> contributions,
+            String committeeId,
+            Map<String, Object> resp,
+            Integer pageNumber,
+            Integer totalPages) {
+
         List<Object> results = (List<Object>) resp.get('results');
         if (results == null) {
-            return contributions;
+            System.debug(LoggingLevel.DEBUG,
+                'FEC Schedule A diagnostics committee=' + committeeId
+                + ' page=' + pageNumber + '/' + totalPages
+                + ' results=0'
+            );
+            return;
         }
+
+        Integer totalRows = 0;
+        Integer withContributorCommitteeId = 0;
+        Integer withContributorId = 0;
+        Integer withCommitteeLikeContributorId = 0;
+        Integer withFallbackCommitteeId = 0;
+        Integer matchedRows = 0;
+        List<String> samples = new List<String>();
 
         for (Object item : results) {
             Map<String, Object> row = (Map<String, Object>) item;
+            totalRows++;
+
             // Filter: only committee-origin contributions.
             String contributorCommitteeId = (String) safeGet(row, 'contributor_committee_id');
+            String contributorId = (String) safeGet(row, 'contributor_id');
+            String entityType = (String) safeGet(row, 'entity_type');
+
+            if (String.isNotBlank(contributorCommitteeId)) {
+                withContributorCommitteeId++;
+            }
+            if (String.isNotBlank(contributorId)) {
+                withContributorId++;
+                if (contributorId.startsWith('C')) {
+                    withCommitteeLikeContributorId++;
+                }
+            }
+
+            // Some Schedule A rows omit contributor_committee_id but still
+            // include a committee-like contributor_id (e.g., C########).
+            if (String.isBlank(contributorCommitteeId)
+                    && String.isNotBlank(contributorId)
+                    && contributorId.startsWith('C')) {
+                contributorCommitteeId = contributorId;
+                withFallbackCommitteeId++;
+            }
+
+            if (samples.size() < SCHEDULE_A_SAMPLE_ROWS) {
+                samples.add(
+                    'sub_id=' + String.valueOf(safeGet(row, 'sub_id'))
+                    + ', contributor_committee_id=' + contributorCommitteeId
+                    + ', contributor_id=' + contributorId
+                    + ', entity_type=' + entityType
+                    + ', contributor_name=' + String.valueOf(safeGet(row, 'contributor_name'))
+                );
+            }
+
             if (String.isBlank(contributorCommitteeId)) {
                 continue;
             }
 
-            String entityType = (String) safeGet(row, 'entity_type');
+            matchedRows++;
 
             ScheduleAContribution c = new ScheduleAContribution();
             c.transactionId           = (String)  safeGet(row, 'sub_id');
@@ -169,7 +295,37 @@ public with sharing class FECAPIService {
             c.entityType              = entityType;
             contributions.add(c);
         }
-        return contributions;
+
+        Boolean shouldLogDiagnostics =
+            (pageNumber == 1)
+            || (pageNumber == totalPages)
+            || (Math.mod(pageNumber, 25) == 0);
+
+        if (shouldLogDiagnostics) {
+            System.debug(LoggingLevel.DEBUG,
+                'FEC Schedule A diagnostics committee=' + committeeId
+                + ' page=' + pageNumber + '/' + totalPages
+                + ' totalRows=' + totalRows
+                + ' withContributorCommitteeId=' + withContributorCommitteeId
+                + ' withContributorId=' + withContributorId
+                + ' withCommitteeLikeContributorId=' + withCommitteeLikeContributorId
+                + ' withFallbackCommitteeId=' + withFallbackCommitteeId
+                + ' matchedRows=' + matchedRows
+            );
+            if (!samples.isEmpty()) {
+                System.debug(LoggingLevel.DEBUG,
+                    'FEC Schedule A sample rows committee=' + committeeId
+                    + ' page=' + pageNumber + '/' + totalPages
+                    + ' samples=' + String.join(samples, ' || ')
+                );
+            }
+        }
+    }
+
+    private Integer getPaginationPages(Map<String, Object> resp) {
+        Map<String, Object> pagination = (Map<String, Object>) resp.get('pagination');
+        Integer totalPages = toInteger(safeGet(pagination, 'pages'));
+        return (totalPages == null || totalPages < 1) ? 1 : totalPages;
     }
 
     /**
