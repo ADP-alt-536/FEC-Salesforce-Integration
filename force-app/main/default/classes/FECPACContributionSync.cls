@@ -128,16 +128,20 @@ public with sharing class FECPACContributionSync {
             }
         }
 
-        // Ensure contributor FEC_Committee__c records exist
-        ensureCommitteesExist(contributorIds, cycle);
-
-        // Build lookup maps: committeeId → Salesforce record Id
-        Map<String, Id> committeeIdMap = buildCommitteeIdMap(contributorIds, recipientCommitteeId);
-        Map<String, String> committeeNameMap = buildCommitteeNameMap(contributorIds, recipientCommitteeId);
-
         // Build lookup map: contributor committee FEC id → Account Id
         Map<String, Id> contributorFecIdToAccountMap =
             buildContributorAccountMap(contributorIds);
+
+        // Only materialize contributor committees that are linked to Accounts.
+        Set<String> linkedContributorIds = new Set<String>();
+        linkedContributorIds.addAll(contributorFecIdToAccountMap.keySet());
+
+        // Ensure only account-linked contributor FEC_Committee__c records exist.
+        ensureCommitteesExist(linkedContributorIds, cycle);
+
+        // Build lookup maps: committeeId → Salesforce record Id
+        Map<String, Id> committeeIdMap = buildCommitteeIdMap(linkedContributorIds, recipientCommitteeId);
+        Map<String, String> committeeNameMap = buildCommitteeNameMap(linkedContributorIds, recipientCommitteeId);
 
         // Build PAC_Contribution__c records
         List<PAC_Contribution__c> contributions = new List<PAC_Contribution__c>();
@@ -280,11 +284,14 @@ public with sharing class FECPACContributionSync {
 
         Map<String, String> result = new Map<String, String>();
         for (FEC_Committee__c c : [
-            SELECT FEC_Committee_ID__c, Committee_Name__c
+            SELECT FEC_Committee_ID__c, Committee_Name__c, Name
             FROM FEC_Committee__c
             WHERE FEC_Committee_ID__c IN :allIds
         ]) {
-            result.put(c.FEC_Committee_ID__c, c.Committee_Name__c);
+            String committeeName = String.isNotBlank(c.Committee_Name__c)
+                ? c.Committee_Name__c
+                : c.Name;
+            result.put(c.FEC_Committee_ID__c, committeeName);
         }
         return result;
     }
