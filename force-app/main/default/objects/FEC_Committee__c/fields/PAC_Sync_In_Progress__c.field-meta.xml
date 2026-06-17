@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>PAC_Sync_In_Progress__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>True while a guarded PAC contribution queueable chain is active for this committee.</description>
+    <label>PAC Sync In Progress</label>
+    <type>Checkbox</type>
+</CustomField>

@@ -41,4 +41,24 @@
         <field>PAC_Contribution__c.Contributor_Committee_Name__c</field>
         <readable>true</readable>
     </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>FEC_Committee__c.PAC_Sync_In_Progress__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>FEC_Committee__c.PAC_Sync_Cycle__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>FEC_Committee__c.PAC_Sync_Chain_Token__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <editable>true</editable>
+        <field>FEC_Committee__c.PAC_Sync_Lock_Expires__c</field>
+        <readable>true</readable>
+    </fieldPermissions>
 </PermissionSet>

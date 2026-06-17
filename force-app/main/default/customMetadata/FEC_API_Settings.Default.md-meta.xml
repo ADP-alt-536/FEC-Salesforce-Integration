@@ -12,7 +12,7 @@
     </values>
     <values>
         <field>Request_Timeout__c</field>
-        <value xsi:type="xsd:double">120000</value>
+        <value xsi:type="xsd:double">30000</value>
     </values>
     <values>
         <field>Batch_Size__c</field>

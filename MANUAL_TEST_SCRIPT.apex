@@ -31,11 +31,15 @@ if (committee == null) {
     return;
 }
 
-Id queuedJobId = System.enqueueJob(new FECManualPACSyncQueueable(
+Id queuedJobId = FECManualPACSyncQueueable.enqueueIfNotActive(
     committee.FEC_Committee_ID__c,
     cycleYear,
     leg.Id
-));
+);
+
+if (queuedJobId == null) {
+    System.debug('PAC queueable not started because a chain is already active for this committee/cycle.');
+}
 
 System.debug('Workflow triggered.');
 System.debug('Cycle: ' + cycleYear);
