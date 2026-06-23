@@ -12,6 +12,32 @@ private class FECCandidateLookupQueueableTest {
         return new FECAPIService('TEST_KEY', 'https://api.open.fec.gov/v1', 120000, 100);
     }
 
+    // ─── toFecNameFormat ──────────────────────────────────────────────────────
+
+    @IsTest
+    static void testToFecNameFormat_conversions() {
+        System.assertEquals('PELOSI, NANCY',    FECCandidateLookupQueueable.toFecNameFormat('Nancy Pelosi'));
+        System.assertEquals('SMITH, JOHN',      FECCandidateLookupQueueable.toFecNameFormat('John Smith'));
+        System.assertEquals('SMITH, MARY JO',   FECCandidateLookupQueueable.toFecNameFormat('Mary Jo Smith'));
+        System.assertEquals('PELOSI, NANCY',    FECCandidateLookupQueueable.toFecNameFormat('PELOSI, NANCY'));  // already FEC format
+        System.assertEquals('PELOSI',           FECCandidateLookupQueueable.toFecNameFormat('Pelosi'));         // single word
+        System.assertEquals(null,               FECCandidateLookupQueueable.toFecNameFormat(null));
+        System.assertEquals(null,               FECCandidateLookupQueueable.toFecNameFormat(''));
+    }
+
+    // ─── toFecDistrict ────────────────────────────────────────────────────────
+
+    @IsTest
+    static void testToFecDistrict_conversions() {
+        System.assertEquals('51', FECCandidateLookupQueueable.toFecDistrict('CA-51'));  // strips state prefix
+        System.assertEquals('01', FECCandidateLookupQueueable.toFecDistrict('CA-1'));   // zero-pads single digit
+        System.assertEquals('51', FECCandidateLookupQueueable.toFecDistrict('51'));     // no prefix, passes through
+        System.assertEquals('01', FECCandidateLookupQueueable.toFecDistrict('1'));      // no prefix, zero-pads
+        System.assertEquals(null, FECCandidateLookupQueueable.toFecDistrict('CA-AL')); // non-numeric (at-large)
+        System.assertEquals(null, FECCandidateLookupQueueable.toFecDistrict(null));
+        System.assertEquals(null, FECCandidateLookupQueueable.toFecDistrict(''));
+    }
+
     // ─── toFecPartyCode ───────────────────────────────────────────────────────
 
     @IsTest

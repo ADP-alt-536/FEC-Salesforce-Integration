@@ -39,10 +39,11 @@ public class FECCandidateLookupQueueable implements Queueable, Database.AllowsCa
 
         for (Legislator__c leg : legislators) {
             try {
-                Map<String, String> params = new Map<String, String>{ 'name' => leg.Name__c };
+                Map<String, String> params = new Map<String, String>{ 'name' => toFecNameFormat(leg.Name__c) };
                 String fecParty = toFecPartyCode(leg.Party__c);
                 if (String.isNotBlank(fecParty))        params.put('party',    fecParty);
-                if (String.isNotBlank(leg.District__c)) params.put('district', leg.District__c);
+                String fecDistrict = toFecDistrict(leg.District__c);
+                if (String.isNotBlank(fecDistrict))     params.put('district', fecDistrict);
 
                 List<FECAPIService.CandidateSearchResult> matches = svc.searchCandidates(params);
 
@@ -51,8 +52,20 @@ public class FECCandidateLookupQueueable implements Queueable, Database.AllowsCa
                         Id                  = leg.Id,
                         FEC_Candidate_ID__c = matches[0].candidateId
                     ));
+                    System.debug(LoggingLevel.INFO,
+                        'FEC candidate lookup matched Legislator ' + leg.Id
+                        + ' Name__c=' + leg.Name__c
+                        + ' -> candidate_id=' + matches[0].candidateId);
+                } else if (matches.isEmpty()) {
+                    System.debug(LoggingLevel.WARN,
+                        'FEC candidate lookup returned 0 results for Legislator ' + leg.Id
+                        + ' Name__c=' + leg.Name__c + ' params=' + params);
+                } else {
+                    System.debug(LoggingLevel.WARN,
+                        'FEC candidate lookup returned ' + matches.size() + ' results (ambiguous) for Legislator ' + leg.Id
+                        + ' Name__c=' + leg.Name__c + ' params=' + params
+                        + ' candidates=' + matchSummary(matches));
                 }
-                // 0 or 2+ matches — leave blank for manual resolution
             } catch (Exception e) {
                 System.debug(LoggingLevel.ERROR,
                     'FEC candidate lookup failed for Legislator ' + leg.Id
@@ -63,6 +76,38 @@ public class FECCandidateLookupQueueable implements Queueable, Database.AllowsCa
         if (!toUpdate.isEmpty()) {
             update toUpdate;
         }
+    }
+
+    private static String matchSummary(List<FECAPIService.CandidateSearchResult> matches) {
+        List<String> parts = new List<String>();
+        for (FECAPIService.CandidateSearchResult r : matches) {
+            parts.add(r.candidateId + '/' + r.name + '/' + r.state + '/' + r.office);
+        }
+        return String.join(parts, ', ');
+    }
+
+    // Converts "First Last" → "LAST, FIRST" to match FEC name storage format.
+    // Names already containing a comma (e.g. "PELOSI, NANCY") pass through unchanged.
+    // Single-word names pass through as-is.
+    @TestVisible
+    private static String toFecNameFormat(String name) {
+        if (String.isBlank(name)) return null;
+        String n = name.trim().toUpperCase();
+        if (n.contains(',')) return n;          // already in FEC format
+        Integer lastSpace = n.lastIndexOf(' ');
+        if (lastSpace == -1) return n;          // single-word name, search as-is
+        return n.substring(lastSpace + 1) + ', ' + n.substring(0, lastSpace).trim();
+    }
+
+    // Strips state prefix from District__c values like "CA-51" → "51".
+    // Zero-pads single-digit districts: "1" → "01". Returns null for non-numeric values.
+    @TestVisible
+    private static String toFecDistrict(String district) {
+        if (String.isBlank(district)) return null;
+        Integer hyphen = district.lastIndexOf('-');
+        String num = (hyphen >= 0) ? district.substring(hyphen + 1).trim() : district.trim();
+        if (!num.isNumeric()) return null;
+        return num.length() == 1 ? '0' + num : num;
     }
 
     // Maps Party__c picklist labels to FEC 3-letter party codes.
