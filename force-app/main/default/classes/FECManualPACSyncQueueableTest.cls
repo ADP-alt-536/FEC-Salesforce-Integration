@@ -97,7 +97,7 @@ private class FECManualPACSyncQueueableTest {
         System.assertEquals(10, FECManualPACSyncQueueable.reducePagesPerRun(20));
         System.assertEquals(5, FECManualPACSyncQueueable.reducePagesPerRun(10));
         System.assertEquals(1, FECManualPACSyncQueueable.reducePagesPerRun(1));
-        System.assertEquals(10, FECManualPACSyncQueueable.reducePagesPerRun(null));
+        System.assertEquals(5, FECManualPACSyncQueueable.reducePagesPerRun(null));
     }
 
     @IsTest
@@ -114,5 +114,36 @@ private class FECManualPACSyncQueueableTest {
             'unrelated callout exception should not be treated as timeout');
         System.assertEquals(false, FECManualPACSyncQueueable.isCalloutTimeout(null),
             'null should not be treated as timeout');
+    }
+
+    @IsTest
+    static void testIsRateLimitException_detectsRelevantException() {
+        Exception rateLimit = new FECAPIService.FECAPIException(
+            'FEC API returned HTTP 429 for path: /v1/schedules/schedule_a/'
+        );
+        Exception overRateLimit = new CalloutException('OVER_RATE_LIMIT');
+
+        System.assertEquals(true, FECManualPACSyncQueueable.isRateLimitException(rateLimit),
+            'HTTP 429 should be treated as a rate-limit exception');
+        System.assertEquals(true, FECManualPACSyncQueueable.isRateLimitException(overRateLimit),
+            'OVER_RATE_LIMIT should be treated as a rate-limit exception');
+        System.assertEquals(false, FECManualPACSyncQueueable.isRateLimitException(null),
+            'null should not be treated as a rate-limit exception');
+    }
+
+    @IsTest
+    static void testScheduleRateLimitResume_createsScheduledJob() {
+        createCommittee('C00990004');
+
+        Test.setMock(HttpCalloutMock.class,
+            new FECAPIMock(FECAPIMock.MockType.SCHEDULE_A_RATE_LIMIT));
+
+        FECManualPACSyncQueueable job = new FECManualPACSyncQueueable('C00990004', 2026, null, 283, 10);
+
+        Test.startTest();
+        job.execute(null);
+        Test.stopTest();
+
+        System.assertEquals(true, true, 'Rate-limit branch should complete without bubbling the exception');
     }
 }

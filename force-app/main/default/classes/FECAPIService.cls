@@ -48,6 +48,16 @@ public with sharing class FECAPIService {
         public Integer endPage;
     }
 
+    /** Represents a candidate record returned by the FEC candidate search endpoint. */
+    public class CandidateSearchResult {
+        public String candidateId;
+        public String name;
+        public String office;    // H, S, or P
+        public String state;
+        public String party;
+        public String district;
+    }
+
     /** Lightweight wrapper used when a callout responds with a non-2xx status. */
     public class FECAPIException extends Exception {}
 
@@ -375,6 +385,50 @@ public with sharing class FECAPIService {
         }
         Map<String, Object> row = (Map<String, Object>) results[0];
         return (String) safeGet(row, 'committee_id');
+    }
+
+    /**
+     * Searches the FEC candidate index by name and optional filters.
+     * Passes up to 25 results; callers decide how to handle 0 or 2+ matches.
+     *
+     * @param params  Search filters; must include at least 'name'. Optional keys:
+     *                'party' (FEC 3-letter code), 'district', 'office', 'state'
+     * @return        List of CandidateSearchResult (may be empty)
+     */
+    public List<CandidateSearchResult> searchCandidates(Map<String, String> params) {
+        if (params == null || String.isBlank(params.get('name'))) {
+            return new List<CandidateSearchResult>();
+        }
+        String path = '/v1/candidates/?per_page=25&api_key='
+                      + EncodingUtil.urlEncode(apiKey, 'UTF-8');
+        for (String key : params.keySet()) {
+            String val = params.get(key);
+            if (String.isNotBlank(val)) {
+                path += '&' + EncodingUtil.urlEncode(key, 'UTF-8')
+                      + '=' + EncodingUtil.urlEncode(val, 'UTF-8');
+            }
+        }
+        Map<String, Object> resp = makeGetRequest(path);
+        if (resp == null) {
+            return new List<CandidateSearchResult>();
+        }
+        List<Object> results = (List<Object>) resp.get('results');
+        if (results == null || results.isEmpty()) {
+            return new List<CandidateSearchResult>();
+        }
+        List<CandidateSearchResult> out = new List<CandidateSearchResult>();
+        for (Object item : results) {
+            Map<String, Object> row = (Map<String, Object>) item;
+            CandidateSearchResult r = new CandidateSearchResult();
+            r.candidateId = (String) safeGet(row, 'candidate_id');
+            r.name        = (String) safeGet(row, 'name');
+            r.office      = (String) safeGet(row, 'office');
+            r.state       = (String) safeGet(row, 'state');
+            r.party       = (String) safeGet(row, 'party');
+            r.district    = (String) safeGet(row, 'district');
+            out.add(r);
+        }
+        return out;
     }
 
     // ─── Private Helpers ─────────────────────────────────────────────────────
