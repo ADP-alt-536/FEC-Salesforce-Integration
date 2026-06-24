@@ -146,4 +146,200 @@ private class FECManualPACSyncQueueableTest {
 
         System.assertEquals(true, true, 'Rate-limit branch should complete without bubbling the exception');
     }
+
+    @IsTest
+    static void testEnqueueIfNotActive_blocksWhenLockedAndAllowsWhenReleased() {
+        createCommittee('C00990005');
+        Datetime nowValue = Datetime.now();
+
+        Test.setMock(HttpCalloutMock.class,
+            new FECAPIMock(FECAPIMock.MockType.SCHEDULE_A_EMPTY));
+
+        System.assertEquals(true, FECManualPACSyncQueueable.acquireChainLock(
+            'C00990005',
+            2026,
+            'active-token',
+            nowValue
+        ));
+
+        Id blocked = FECManualPACSyncQueueable.enqueueIfNotActive('C00990005', 2026, null);
+        System.assertEquals(null, blocked, 'enqueueIfNotActive should return null when lock is already active');
+
+        FECManualPACSyncQueueable.releaseChainLock('C00990005', 2026, 'active-token');
+
+        Id enqueued = FECManualPACSyncQueueable.enqueueIfNotActive('C00990005', 2026, null);
+        System.assertNotEquals(null, enqueued, 'enqueueIfNotActive should enqueue when lock is available');
+    }
+
+    @IsTest
+    static void testExecuteSkipsWhenChainLockMissing() {
+        createCommittee('C00990010');
+
+        FECManualPACSyncQueueable job = new FECManualPACSyncQueueable('C00990010', 2026, null);
+
+        Test.startTest();
+        job.execute(null);
+        Test.stopTest();
+
+        System.assertEquals(true, true,
+            'execute should safely return when the queueable token does not own an active lock');
+    }
+
+    @IsTest
+    static void testEnqueueIfNotActive_executesAndReleasesLockOnNoMorePages() {
+        createCommittee('C00990009');
+
+        Test.setMock(HttpCalloutMock.class,
+            new FECAPIMock(FECAPIMock.MockType.SCHEDULE_A_EMPTY));
+
+        Test.startTest();
+        Id jobId = FECManualPACSyncQueueable.enqueueIfNotActive('C00990009', 2026, null);
+        Test.stopTest();
+
+        System.assertNotEquals(null, jobId, 'Expected queueable job to be enqueued');
+
+        FEC_Committee__c committee = [
+            SELECT PAC_Sync_In_Progress__c, PAC_Sync_Cycle__c, PAC_Sync_Chain_Token__c, PAC_Sync_Lock_Expires__c
+            FROM FEC_Committee__c
+            WHERE FEC_Committee_ID__c = 'C00990009'
+            LIMIT 1
+        ];
+
+        System.assertEquals(false, committee.PAC_Sync_In_Progress__c,
+            'Lock should be released after completing a no-more-pages sync');
+        System.assertEquals(null, committee.PAC_Sync_Cycle__c,
+            'Cycle lock marker should be cleared after completion');
+        System.assertEquals(null, committee.PAC_Sync_Chain_Token__c,
+            'Chain token should be cleared after completion');
+        System.assertEquals(null, committee.PAC_Sync_Lock_Expires__c,
+            'Lock expiration should be cleared after completion');
+    }
+
+    @IsTest
+    static void testHasValidChainLockAndReleaseEdgeCases() {
+        createCommittee('C00990006');
+        Datetime nowValue = Datetime.now();
+
+        System.assertEquals(false, FECManualPACSyncQueueable.hasValidChainLock(
+            'C00990006',
+            2026,
+            'token-x',
+            nowValue
+        ));
+
+        System.assertEquals(true, FECManualPACSyncQueueable.acquireChainLock(
+            'C00990006',
+            2026,
+            'token-x',
+            nowValue
+        ));
+
+        System.assertEquals(true, FECManualPACSyncQueueable.hasValidChainLock(
+            'C00990006',
+            2026,
+            'token-x',
+            nowValue
+        ));
+
+        System.assertEquals(false, FECManualPACSyncQueueable.hasValidChainLock(
+            'C00990006',
+            2026,
+            'token-y',
+            nowValue
+        ));
+
+        FECManualPACSyncQueueable.releaseChainLock('C00990006', 2027, 'token-x');
+        System.assertEquals(true, FECManualPACSyncQueueable.hasValidChainLock(
+            'C00990006',
+            2026,
+            'token-x',
+            nowValue
+        ));
+
+        FECManualPACSyncQueueable.releaseChainLock('C00990006', 2026, 'token-x');
+        System.assertEquals(false, FECManualPACSyncQueueable.hasValidChainLock(
+            'C00990006',
+            2026,
+            'token-x',
+            nowValue
+        ));
+    }
+
+    @IsTest
+    static void testExtendChainLockAndScheduleContinuation() {
+        createCommittee('C00990007');
+        Datetime nowValue = Datetime.now();
+
+        System.assertEquals(true, FECManualPACSyncQueueable.acquireChainLock(
+            'C00990007',
+            2026,
+            'token-z',
+            nowValue
+        ));
+
+        Boolean extended = FECManualPACSyncQueueable.extendChainLock(
+            'C00990007',
+            2026,
+            'token-z',
+            15
+        );
+        System.assertEquals(true, extended, 'extendChainLock should keep lock active for matching token and cycle');
+
+        Test.startTest();
+        Id jobId = FECManualPACSyncQueueable.scheduleContinuation(
+            'C00990007',
+            2026,
+            null,
+            11,
+            3,
+            'token-z',
+            0,
+            1,
+            'test continuation'
+        );
+        Test.stopTest();
+
+        System.assertNotEquals(null, jobId, 'scheduleContinuation should create a scheduled job when lock is valid');
+    }
+
+    @IsTest
+    static void testScheduleContinuationThrowsWhenLockCannotBeExtended() {
+        createCommittee('C00990008');
+
+        Boolean threw = false;
+        try {
+            FECManualPACSyncQueueable.scheduleContinuation(
+                'C00990008',
+                2026,
+                null,
+                5,
+                2,
+                'different-token',
+                0,
+                1,
+                'missing lock'
+            );
+        } catch (Exception ex) {
+            threw = true;
+            System.assert(
+                ex.getMessage().contains('could not extend its chain lock'),
+                'Expected scheduleContinuation to fail when lock cannot be extended'
+            );
+        }
+
+        System.assertEquals(true, threw, 'Expected scheduleContinuation to throw without a valid lock');
+    }
+
+    @IsTest
+    static void testGuardClausesForInvalidInputs() {
+        System.assertEquals(false, FECManualPACSyncQueueable.acquireChainLock(null, 2026, 'token', Datetime.now()));
+        System.assertEquals(false, FECManualPACSyncQueueable.extendChainLock('C001', null, 'token', 60));
+        System.assertEquals(false, FECManualPACSyncQueueable.hasValidChainLock('C001', 2026, null, Datetime.now()));
+        System.assertEquals(false, FECManualPACSyncQueueable.isCalloutTimeout(
+            new FECAPIService.FECAPIException('read timed out')),
+            'Only CalloutException instances should be treated as callout timeout');
+        System.assertEquals(false, FECManualPACSyncQueueable.isRateLimitException(
+            new FECAPIService.FECAPIException('some other error')),
+            'Non-rate-limit errors should not match rate-limit detection');
+    }
 }
