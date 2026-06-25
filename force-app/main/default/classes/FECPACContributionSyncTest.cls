@@ -25,14 +25,10 @@ private class FECPACContributionSyncTest {
         );
         insert recipientComm;
 
-        // The mock will serve:
-        //  1st call (getScheduleAContributions) → ScheduleA with 1 COMMITTEE + 1 INDIVIDUAL
-        //  Subsequent calls for ensureCommitteesExist → committee financials
+        // Mock only the Schedule A call. Contributor committees should not be
+        // materialized when no Account.FEC_ID__c match exists.
         Test.setMock(HttpCalloutMock.class,
-            new FECMultiMock(new List<HttpCalloutMock>{
-                new FECAPIMock(FECAPIMock.MockType.SCHEDULE_A_CONTRIBUTIONS),
-                new FECAPIMock(FECAPIMock.MockType.COMMITTEE_FINANCIALS)
-            }));
+            new FECAPIMock(FECAPIMock.MockType.SCHEDULE_A_CONTRIBUTIONS));
 
         Test.startTest();
         FECAPIService apiSvc = testApiService();
@@ -43,6 +39,11 @@ private class FECPACContributionSyncTest {
 
         System.assertEquals(0, results.size(),
             'PAC contribution should be skipped when no Account.FEC_ID__c match exists');
+        System.assertEquals(0, [
+            SELECT COUNT()
+            FROM FEC_Committee__c
+            WHERE FEC_Committee_ID__c = 'C00111111'
+        ], 'Contributor committee should not be created without Account.FEC_ID__c linkage');
     }
 
     @IsTest
@@ -129,12 +130,45 @@ private class FECPACContributionSyncTest {
         System.assertEquals('TRN001', results[0].Transaction_ID__c);
         System.assertEquals('ACME PAC', results[0].Source_Name__c);
         System.assertEquals('C00111111', results[0].Source_FEC_ID__c);
-        System.assertEquals('ACME PAC Committee', results[0].Contributor_Committee_Name__c);
-        System.assertEquals('Recipient Committee', results[0].Recipient_Committee_Name__c);
         System.assertEquals(5000.00, results[0].Contribution_Amount__c);
         System.assertEquals(recipientComm.Id, results[0].Recipient_Committee__c);
         System.assertEquals(acc.Id, results[0].Contributing_Account__c,
             'Contributing_Account__c should be set by Account.FEC_ID__c');
+    }
+
+    @IsTest
+    static void testSyncContributions_linksAccountByNormalizedFecId() {
+        FEC_Committee__c contributorComm = new FEC_Committee__c(
+            FEC_Committee_ID__c = 'C00111111',
+            Name                = 'ACME PAC Committee'
+        );
+        insert contributorComm;
+
+        FEC_Committee__c recipientComm = new FEC_Committee__c(
+            FEC_Committee_ID__c = 'C00177436',
+            Name                = 'Recipient Committee'
+        );
+        insert recipientComm;
+
+        Account acc = new Account(Name = 'ACME Corp normalized FEC ID');
+        acc.put('FEC_ID__c', ' c00111111 ');
+        insert acc;
+
+        Test.setMock(HttpCalloutMock.class,
+            new FECAPIMock(FECAPIMock.MockType.SCHEDULE_A_CONTRIBUTIONS));
+
+        Test.startTest();
+        FECAPIService apiSvc = testApiService();
+        FECPACContributionSync sync = new FECPACContributionSync(apiSvc, new FECCommitteeSync(apiSvc));
+        List<PAC_Contribution__c> results =
+            sync.syncContributions('C00177436', 2024, null);
+        Test.stopTest();
+
+        System.assertEquals(1, results.size(),
+            'Contribution should be created when Account.FEC_ID__c only differs by case/whitespace');
+        System.assertEquals('C00111111', results[0].Source_FEC_ID__c,
+            'Source_FEC_ID__c should be normalized for consistent linkage');
+        System.assertEquals(acc.Id, results[0].Contributing_Account__c);
     }
 
     @IsTest
@@ -151,10 +185,7 @@ private class FECPACContributionSyncTest {
         insert recipientComm;
 
         Test.setMock(HttpCalloutMock.class,
-            new FECMultiMock(new List<HttpCalloutMock>{
-                new FECAPIMock(FECAPIMock.MockType.SCHEDULE_A_CONTRIBUTIONS),
-                new FECAPIMock(FECAPIMock.MockType.COMMITTEE_FINANCIALS)
-            }));
+            new FECAPIMock(FECAPIMock.MockType.SCHEDULE_A_CONTRIBUTIONS));
 
         Test.startTest();
         FECAPIService apiSvc = testApiService();
@@ -165,6 +196,11 @@ private class FECPACContributionSyncTest {
 
         System.assertEquals(0, results.size(),
             'Legislator should not be linked when no Account.FEC_ID__c-matched contribution is created');
+        System.assertEquals(0, [
+            SELECT COUNT()
+            FROM FEC_Committee__c
+            WHERE FEC_Committee_ID__c = 'C00111111'
+        ], 'Contributor committee should not be created when no linked account exists');
     }
 
     @IsTest

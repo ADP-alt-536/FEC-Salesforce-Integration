@@ -233,6 +233,53 @@ private class FECAPIServiceTest {
         System.debug('testMissingApiKey_throwsFECAPIException: exceptionThrown=' + exceptionThrown);
     }
 
+    // ─── searchCandidates ─────────────────────────────────────────────────────
+
+    @IsTest
+    static void testSearchCandidates_singleResult() {
+        Test.setMock(HttpCalloutMock.class,
+            new FECAPIMock(FECAPIMock.MockType.CANDIDATE_SEARCH_SINGLE));
+
+        Test.startTest();
+        List<FECAPIService.CandidateSearchResult> results =
+            testService().searchCandidates(new Map<String, String>{ 'name' => 'DOE, JOHN' });
+        Test.stopTest();
+
+        System.assertEquals(1, results.size(), 'Should return one result');
+        System.assertEquals('H00001234', results[0].candidateId, 'Candidate ID mismatch');
+        System.assertEquals('DOE, JOHN',  results[0].name,        'Name mismatch');
+        System.assertEquals('H',          results[0].office,      'Office mismatch');
+        System.assertEquals('CA',         results[0].state,       'State mismatch');
+        System.assertEquals('DEM',        results[0].party,       'Party mismatch');
+        System.assertEquals('01',         results[0].district,    'District mismatch');
+    }
+
+    @IsTest
+    static void testSearchCandidates_emptyResult() {
+        Test.setMock(HttpCalloutMock.class,
+            new FECAPIMock(FECAPIMock.MockType.CANDIDATE_SEARCH_EMPTY));
+
+        Test.startTest();
+        List<FECAPIService.CandidateSearchResult> results =
+            testService().searchCandidates(new Map<String, String>{ 'name' => 'NOBODY' });
+        Test.stopTest();
+
+        System.assertEquals(0, results.size(), 'Empty API response should return empty list');
+    }
+
+    @IsTest
+    static void testSearchCandidates_nullOrBlankName_returnsEmpty() {
+        Test.startTest();
+        List<FECAPIService.CandidateSearchResult> nullResult =
+            testService().searchCandidates(null);
+        List<FECAPIService.CandidateSearchResult> blankResult =
+            testService().searchCandidates(new Map<String, String>{ 'name' => '' });
+        Test.stopTest();
+
+        System.assertEquals(0, nullResult.size(),  'Null params should return empty list');
+        System.assertEquals(0, blankResult.size(), 'Blank name should return empty list');
+    }
+
     // ─── mapCommitteeType (private, tested via @TestVisible) ─────────────────
 
     @IsTest

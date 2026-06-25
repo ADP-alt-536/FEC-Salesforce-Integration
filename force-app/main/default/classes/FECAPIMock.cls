@@ -16,9 +16,13 @@ public class FECAPIMock implements HttpCalloutMock {
             SCHEDULE_A_PAGE2_PAC,
             SCHEDULE_A_CONTRIBUTOR_ID_ONLY,
         SCHEDULE_A_EMPTY,
+        SCHEDULE_A_RATE_LIMIT,
         COMMITTEE_DETAILS,
         PRINCIPAL_COMMITTEE,
         PRINCIPAL_COMMITTEE_EMPTY,
+        CANDIDATE_SEARCH_SINGLE,
+        CANDIDATE_SEARCH_EMPTY,
+        CANDIDATE_SEARCH_MULTI,
         ERROR_500
     }
 
@@ -65,6 +69,10 @@ public class FECAPIMock implements HttpCalloutMock {
                 res.setStatusCode(200);
                 res.setBody('{"results":[],"pagination":{"count":0}}');
             }
+            when SCHEDULE_A_RATE_LIMIT {
+                res.setStatusCode(429);
+                res.setBody('{"error":{"code":"OVER_RATE_LIMIT","message":"You have exceeded your rate limit."}}');
+            }
             when COMMITTEE_DETAILS {
                 res.setStatusCode(200);
                 res.setBody(committeeDetailsJson());
@@ -76,6 +84,18 @@ public class FECAPIMock implements HttpCalloutMock {
             when PRINCIPAL_COMMITTEE_EMPTY {
                 res.setStatusCode(200);
                 res.setBody('{"results":[],"pagination":{"count":0}}');
+            }
+            when CANDIDATE_SEARCH_SINGLE {
+                res.setStatusCode(200);
+                res.setBody(candidateSearchSingleJson());
+            }
+            when CANDIDATE_SEARCH_EMPTY {
+                res.setStatusCode(200);
+                res.setBody('{"results":[],"pagination":{"count":0,"pages":1}}');
+            }
+            when CANDIDATE_SEARCH_MULTI {
+                res.setStatusCode(200);
+                res.setBody(candidateSearchMultiJson());
             }
             when ERROR_500 {
                 res.setStatusCode(500);
@@ -189,5 +209,23 @@ public class FECAPIMock implements HttpCalloutMock {
             + '"name":"Test Campaign Committee",'
             + '"designation":"P"'
             + '}],"pagination":{"count":1}}';
+    }
+
+    private static String candidateSearchSingleJson() {
+        return '{"results":[{'
+            + '"candidate_id":"H00001234",'
+            + '"name":"DOE, JOHN",'
+            + '"office":"H",'
+            + '"state":"CA",'
+            + '"party":"DEM",'
+            + '"district":"01"'
+            + '}],"pagination":{"count":1,"pages":1}}';
+    }
+
+    private static String candidateSearchMultiJson() {
+        return '{"results":['
+            + '{"candidate_id":"H00001234","name":"SMITH, JOHN","office":"H","state":"CA","party":"DEM","district":"01"},'
+            + '{"candidate_id":"H00005678","name":"SMITH, JOHN","office":"H","state":"TX","party":"DEM","district":"02"}'
+            + '],"pagination":{"count":2,"pages":1}}';
     }
 }

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>PAC_Sync_Lock_Expires__c</fullName>
+    <description>Timestamp after which a stale guarded PAC queueable lock can be reclaimed.</description>
+    <label>PAC Sync Lock Expires</label>
+    <type>DateTime</type>
+</CustomField>
