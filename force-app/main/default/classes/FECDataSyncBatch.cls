@@ -8,10 +8,11 @@
  *      PAC_Contribution__c records.
  *
  * Schedule via FECDataSyncScheduler or via Developer Console:
- *   Database.executeBatch(new FECDataSyncBatch(2024), 5);
+ *   Database.executeBatch(new FECDataSyncBatch(2024), 1);
  *
- * Batch size is kept small (default 5) because each record triggers multiple
- * HTTP callouts and Salesforce allows at most 100 callouts per transaction.
+ * Batch size must be 1. Each legislator requires callouts followed by DML, and
+ * Salesforce prohibits callouts after DML in the same transaction. With size 1,
+ * every execute() call is its own transaction: callouts first, then DML.
  */
 public with sharing class FECDataSyncBatch
         implements Database.Batchable<SObject>, Database.AllowsCallouts {
@@ -29,7 +30,7 @@ public with sharing class FECDataSyncBatch
 
     /** Default constructor uses the current election cycle. */
     public FECDataSyncBatch() {
-        this(currentCycle(), 5);
+        this(currentCycle(), 1);
     }
 
     /**
@@ -42,7 +43,7 @@ public with sharing class FECDataSyncBatch
     }
 
     public FECDataSyncBatch(Integer cycle) {
-        this(cycle, 5);
+        this(cycle, 1);
     }
 
     // ─── Batchable Interface ──────────────────────────────────────────────────
@@ -56,14 +57,13 @@ public with sharing class FECDataSyncBatch
     }
 
     public void execute(Database.BatchableContext bc, List<SObject> scope) {
-        FECAPIService         apiSvc  = createApiService();
-        FECCommitteeSync      commSvc = new FECCommitteeSync(apiSvc);
-        FECPACContributionSync pacSvc = new FECPACContributionSync(apiSvc, commSvc);
+        FECAPIService    apiSvc  = createApiService();
+        FECCommitteeSync commSvc = new FECCommitteeSync(apiSvc);
 
         for (SObject obj : scope) {
             Legislator__c leg = (Legislator__c) obj;
             try {
-                processSingleLegislator(leg, commSvc, pacSvc);
+                processSingleLegislator(leg, commSvc);
             } catch (Exception ex) {
                 System.debug(LoggingLevel.ERROR,
                     'FECDataSyncBatch.execute: error processing legislator '
@@ -81,10 +81,9 @@ public with sharing class FECDataSyncBatch
 
     private void processSingleLegislator(
             Legislator__c leg,
-            FECCommitteeSync commSvc,
-            FECPACContributionSync pacSvc) {
+            FECCommitteeSync commSvc) {
 
-        // Step 1: Sync / create the principal campaign committee
+        // Step 1: Sync / create the principal campaign committee (callouts + DML)
         FEC_Committee__c committee =
             commSvc.syncLegislatorPrimaryCommittee(
                 leg.Id,
@@ -99,8 +98,10 @@ public with sharing class FECDataSyncBatch
             return;
         }
 
-        // Step 2: Sync PAC contributions received by that committee
-        pacSvc.syncContributions(
+        // Step 2: Enqueue PAC contribution sync in its own transaction.
+        // Cannot call out after the DML in step 1, so delegate to the queueable.
+        // enqueueIfNotActive also acquires the chain lock (DML only, no callout).
+        FECManualPACSyncQueueable.enqueueIfNotActive(
             committee.FEC_Committee_ID__c,
             cycle,
             leg.Id

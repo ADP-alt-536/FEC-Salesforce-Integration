@@ -19,10 +19,7 @@ private class FECDataSyncBatchTest {
             new Legislator__c(
                 FEC_Candidate_ID__c = 'H00001111'
             ),
-            new Legislator__c(
-                FEC_Candidate_ID__c = 'H00002222'
-            ),
-            // This one has no FEC ID and should be skipped
+            // This one has no FEC ID and should be skipped by the start() WHERE clause
             new Legislator__c(FEC_Candidate_ID__c = null)
         };
         insert legislators;
@@ -34,20 +31,18 @@ private class FECDataSyncBatchTest {
         // + getScheduleAContributions (returns empty, so no PAC inserts)
         Test.setMock(HttpCalloutMock.class,
             new FECMultiMock(new List<HttpCalloutMock>{
-                // Legislator 1 – principal committee lookup
+                // Legislator 1 – principal committee lookup (batch)
                 new FECAPIMock(FECAPIMock.MockType.PRINCIPAL_COMMITTEE),
-                // Legislator 1 – committee financials
+                // Legislator 1 – committee financials (batch)
                 new FECAPIMock(FECAPIMock.MockType.COMMITTEE_FINANCIALS),
-                // Legislator 1 – schedule A (empty)
-                new FECAPIMock(FECAPIMock.MockType.SCHEDULE_A_EMPTY),
-                // Legislator 2 – principal committee (returns empty, no committee synced)
-                new FECAPIMock(FECAPIMock.MockType.PRINCIPAL_COMMITTEE_EMPTY)
+                // Legislator 1 – schedule A contributions (queueable enqueued by batch)
+                new FECAPIMock(FECAPIMock.MockType.SCHEDULE_A_EMPTY)
             }));
 
         Test.startTest();
-        FECDataSyncBatch batch = new FECDataSyncBatch(2024, 5);
+        FECDataSyncBatch batch = new FECDataSyncBatch(2024, 1);
         batch.testApiServiceOverride = testApiService();
-        Database.executeBatch(batch, 5);
+        Database.executeBatch(batch, 1);
         Test.stopTest();
 
         // Legislator 1 should have a committee and Primary_Committee__c set
