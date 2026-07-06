@@ -34,7 +34,7 @@ public with sharing class FECDataSyncScheduler implements Schedulable {
      * Safe to call from the Developer Console for a manual one-off run.
      */
     public static void runNow() {
-        Database.executeBatch(new FECDataSyncBatch(), 5);
+        Database.executeBatch(new FECDataSyncBatch(), 1);
     }
 
     /**

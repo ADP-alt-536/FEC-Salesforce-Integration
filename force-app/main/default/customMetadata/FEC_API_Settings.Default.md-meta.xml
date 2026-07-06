@@ -4,7 +4,7 @@
     <protected>false</protected>
     <values>
         <field>API_Key__c</field>
-        <value xsi:type="xsd:string">oqiPFCVUty0NCh97cZzTNgyyGpmZ2gKKWDipBAce</value>
+        <value xsi:type="xsd:string">(insert API Key here)</value>
     </values>
     <values>
         <field>Base_URL__c</field>

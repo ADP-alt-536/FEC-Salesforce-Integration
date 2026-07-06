@@ -446,7 +446,8 @@ public with sharing class FECAPIService {
         }
 
         if (settings != null && String.isNotBlank(settings.API_Key__c)
-                && settings.API_Key__c != 'REPLACE_WITH_YOUR_FEC_API_KEY') {
+                && settings.API_Key__c != 'REPLACE_WITH_YOUR_FEC_API_KEY'
+                && settings.API_Key__c != 'DEMO_KEY') {
             apiKey    = settings.API_Key__c;
             baseUrl   = String.isNotBlank(settings.Base_URL__c)
                             ? settings.Base_URL__c
